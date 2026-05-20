@@ -112,6 +112,12 @@ export function renderCheckRunSummary(result: ArchitectureAnalysisResult, metada
       return `- ${location}: ${evidence}`;
     })
   );
+  const topEvidenceFiles = Array.from(
+    new Set([
+      ...result.findings.flatMap((finding) => (finding.filePath ? [finding.filePath] : [])),
+      ...extractFilePaths(result.retrievedContextSummary)
+    ])
+  ).slice(0, 8);
 
   return [
     `**Verdict:** ${result.verdict}`,
@@ -130,10 +136,17 @@ export function renderCheckRunSummary(result: ArchitectureAnalysisResult, metada
     "",
     "### Evidence",
     "",
+    "Top evidence files:",
+    topEvidenceFiles.length ? topEvidenceFiles.map((filePath) => `- ${filePath}`).join("\n") : "- None",
+    "",
     evidenceRows.length ? evidenceRows.join("\n") : "- No specific evidence references.",
     "",
     `**Retrieved context:** ${result.retrievedContextSummary}`,
     "",
     "_ArchGuard is advisory in this MVP. Treat results as an architecture fitness signal, not a merge gate._"
   ].filter((line) => line !== undefined).join("\n");
+}
+
+function extractFilePaths(value: string): string[] {
+  return value.match(/(?:docs|src|backend|frontend|ui)\/[A-Za-z0-9._/-]+/g) ?? [];
 }

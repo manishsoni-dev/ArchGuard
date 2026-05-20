@@ -59,8 +59,75 @@ describe("health routes", () => {
         redis: "error",
         env: "ok",
         githubApp: "ok"
+      },
+      githubAppDiagnostics: {
+        appId: "ok",
+        privateKey: "ok",
+        webhookSecret: "ok",
+        clientId: "ok",
+        clientSecret: "ok"
       }
     });
+  });
+
+  it("/ready includes safe GitHub App diagnostics in development", async () => {
+    server = await buildServer({
+      env: {
+        ...testEnv(),
+        NODE_ENV: "development",
+        GITHUB_PRIVATE_KEY:
+          "-----BEGIN RSA PRIVATE KEY-----\nPASTE_REAL_KEY_LINES_HERE\n-----END RSA PRIVATE KEY-----"
+      },
+      eventStore: noopEventStore(),
+      enqueuer: noopEnqueuer(),
+      readiness: okReadiness()
+    });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/ready"
+    });
+
+    const body = response.json();
+    expect(response.statusCode).toBe(503);
+    expect(body.checks).toEqual({
+      database: "ok",
+      redis: "ok",
+      env: "ok",
+      githubApp: "error"
+    });
+    expect(body.githubAppDiagnostics).toEqual({
+      appId: "ok",
+      privateKey: "error",
+      webhookSecret: "ok",
+      clientId: "ok",
+      clientSecret: "ok"
+    });
+    expect(JSON.stringify(body)).not.toContain("PASTE_REAL_KEY_LINES_HERE");
+  });
+
+  it("/ready omits GitHub App diagnostics in production", async () => {
+    server = await buildServer({
+      env: {
+        ...testEnv(),
+        NODE_ENV: "production",
+        GITHUB_PRIVATE_KEY:
+          "-----BEGIN RSA PRIVATE KEY-----\nPASTE_REAL_KEY_LINES_HERE\n-----END RSA PRIVATE KEY-----"
+      },
+      eventStore: noopEventStore(),
+      enqueuer: noopEnqueuer(),
+      readiness: okReadiness()
+    });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/ready"
+    });
+
+    const body = response.json();
+    expect(response.statusCode).toBe(503);
+    expect(body.githubAppDiagnostics).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("PASTE_REAL_KEY_LINES_HERE");
   });
 });
 

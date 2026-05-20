@@ -41,6 +41,11 @@ const envSchema = z.object({
   SMOKE_FAIL_ON_FALLBACK: z.coerce.boolean().default(true),
   LLM_INPUT_COST_PER_1M_TOKENS: z.coerce.number().nonnegative().optional(),
   LLM_OUTPUT_COST_PER_1M_TOKENS: z.coerce.number().nonnegative().optional(),
+  PUBLIC_WEBHOOK_URL: z.string().url().optional(),
+  TEST_GITHUB_OWNER: z.string().optional(),
+  TEST_GITHUB_REPO: z.string().optional(),
+  TEST_GITHUB_PR_NUMBER: z.coerce.number().int().positive().optional(),
+  TEST_GITHUB_INSTALLATION_ID: z.coerce.number().int().positive().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 

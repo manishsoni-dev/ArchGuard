@@ -1,6 +1,6 @@
-import { createPrivateKey } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { Env } from "../env.js";
+import { githubAppDiagnostics } from "../github/github-app-env-validation.js";
 
 type CheckStatus = "ok" | "error";
 type OverallStatus = "ok" | "degraded" | "error";
@@ -39,16 +39,26 @@ export async function registerHealthRoutes(
       database: await toCheckStatus(options.readiness.checkDatabase),
       redis: await toCheckStatus(options.readiness.checkRedis),
       env: requiredEnvPresent(options.env) ? "ok" : "error",
-      githubApp: githubPrivateKeyLooksParseable(options.env.GITHUB_PRIVATE_KEY) ? "ok" : "error"
+      githubApp: githubAppReady(options.env) ? "ok" : "error"
     } satisfies Record<string, CheckStatus>;
 
     const status = readinessStatus(checks);
     const statusCode = status === "ok" ? 200 : 503;
 
-    return reply.code(statusCode).send({
+    const body: {
+      status: OverallStatus;
+      checks: typeof checks;
+      githubAppDiagnostics?: ReturnType<typeof githubAppDiagnostics>;
+    } = {
       status,
       checks
-    });
+    };
+
+    if (options.env.NODE_ENV !== "production") {
+      body.githubAppDiagnostics = githubAppDiagnostics(options.env);
+    }
+
+    return reply.code(statusCode).send(body);
   });
 }
 
@@ -62,25 +72,22 @@ async function toCheckStatus(check: () => Promise<void>): Promise<CheckStatus> {
 }
 
 function requiredEnvPresent(env: RegisterHealthRoutesOptions["env"]): boolean {
-  return [
-    env.DATABASE_URL,
-    env.REDIS_URL,
-    String(env.GITHUB_APP_ID),
-    env.GITHUB_PRIVATE_KEY,
-    env.GITHUB_WEBHOOK_SECRET,
-    env.GITHUB_CLIENT_ID,
-    env.GITHUB_CLIENT_SECRET,
-    env.NODE_ENV
-  ].every((value) => value.trim().length > 0);
+  const requiredValues = {
+    DATABASE_URL: env.DATABASE_URL,
+    REDIS_URL: env.REDIS_URL,
+    GITHUB_APP_ID: String(env.GITHUB_APP_ID),
+    GITHUB_PRIVATE_KEY: env.GITHUB_PRIVATE_KEY,
+    GITHUB_WEBHOOK_SECRET: env.GITHUB_WEBHOOK_SECRET,
+    GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET,
+    NODE_ENV: env.NODE_ENV
+  };
+
+  return Object.values(requiredValues).every((value) => value.trim().length > 0);
 }
 
-function githubPrivateKeyLooksParseable(privateKey: string): boolean {
-  try {
-    createPrivateKey(privateKey);
-    return true;
-  } catch {
-    return false;
-  }
+function githubAppReady(env: RegisterHealthRoutesOptions["env"]): boolean {
+  return Object.values(githubAppDiagnostics(env)).every((value) => value === "ok");
 }
 
 function readinessStatus(checks: Record<string, CheckStatus>): OverallStatus {

@@ -1,6 +1,8 @@
 node_modules
 dist
 .env
+.env.github.local
+.env.backup.*
 .archguard
 coverage
 .DS_Store
