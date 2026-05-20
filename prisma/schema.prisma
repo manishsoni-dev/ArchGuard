@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  ENQUEUED
+  IGNORED
+  FAILED
+}
+
+enum AnalysisRunStatus {
+  QUEUED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum ChunkType {
+  CODE
+  TEST
+  CONFIG
+  DOC
+  ADR
+}
+
+enum EmbeddingStatus {
+  PENDING
+  EMBEDDED
+  FAILED
+}
+
+enum ArchitectureDocumentType {
+  ADR
+  README
+  DESIGN_DOC
+  OTHER
+}
+
+model Tenant {
+  id                   String        @id @default(cuid())
+  name                 String
+  githubInstallationId Int?          @unique
+  repositories         Repository[]
+  pullRequests         PullRequest[]
+  indexedFiles         IndexedFile[]
+  codeChunks           CodeChunk[]
+  architectureDocuments ArchitectureDocument[]
+  analysisRuns         AnalysisRun[]
+  webhookEvents        WebhookEvent[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+model Repository {
+  id                 String        @id @default(cuid())
+  tenantId           String
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  githubRepositoryId BigInt        @unique
+  owner              String
+  name               String
+  fullName           String
+  cloneUrl           String
+  defaultBranch      String?
+  pullRequests       PullRequest[]
+  indexedFiles       IndexedFile[]
+  codeChunks         CodeChunk[]
+  architectureDocuments ArchitectureDocument[]
+  analysisRuns       AnalysisRun[]
+  webhookEvents      WebhookEvent[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@unique([tenantId, fullName])
+  @@index([tenantId])
+}
+
+model PullRequest {
+  id                  String        @id @default(cuid())
+  tenantId            String
+  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repositoryId        String
+  repository          Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  githubPullRequestId BigInt
+  number              Int
+  title               String
+  state               String
+  headSha             String
+  baseSha             String?
+  diffUrl             String?
+  openedByLogin       String?
+  analysisRuns        AnalysisRun[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@unique([repositoryId, number])
+  @@index([tenantId])
+  @@index([headSha])
+}
+
+model WebhookEvent {
+  id                  String     @id @default(cuid())
+  tenantId            String?
+  tenant              Tenant?    @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  repositoryId        String?
+  repository          Repository? @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  githubDeliveryId    String     @unique
+  eventName           String
+  action              String?
+  repositoryFullName  String?
+  pullRequestNumber   Int?
+  payloadJson         Json
+  receivedAt          DateTime   @default(now())
+  processedAt         DateTime?
+  status              WebhookEventStatus
+
+  @@index([tenantId])
+  @@index([repositoryId])
+  @@index([eventName])
+  @@index([status])
+}
+
+model IndexedFile {
+  id             String      @id @default(cuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repositoryId   String
+  repository     Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  filePath       String
+  fileType       String
+  contentHash    String
+  language       String?
+  sizeBytes      Int
+  lastIndexedAt  DateTime    @default(now())
+  chunks         CodeChunk[]
+
+  @@unique([repositoryId, filePath])
+  @@index([tenantId])
+  @@index([repositoryId])
+}
+
+model CodeChunk {
+  id            String      @id @default(cuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repositoryId  String
+  repository    Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  indexedFileId String
+  indexedFile   IndexedFile @relation(fields: [indexedFileId], references: [id], onDelete: Cascade)
+  ordinal       Int
+  chunkType     ChunkType   @default(CODE)
+  filePath      String
+  symbolName    String?
+  content       String
+  contentHash   String
+  startLine     Int?
+  endLine       Int?
+  embeddingStatus EmbeddingStatus @default(PENDING)
+  embeddingModel  String?
+  embedding     Json?
+  embeddingVector Unsupported("vector(1536)")?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([indexedFileId, ordinal])
+  @@index([tenantId])
+  @@index([repositoryId])
+  @@index([repositoryId, chunkType])
+  @@index([repositoryId, filePath])
+  @@index([embeddingStatus])
+}
+
+model ArchitectureDocument {
+  id             String                   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repositoryId   String
+  repository     Repository               @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  documentType   ArchitectureDocumentType
+  title          String?
+  filePath       String
+  status         String?
+  contentHash    String
+  lastIndexedAt  DateTime                 @default(now())
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([repositoryId, filePath])
+  @@index([tenantId])
+  @@index([repositoryId])
+  @@index([repositoryId, documentType])
+}
+
+model AnalysisRun {
+  id                      String        @id @default(cuid())
+  tenantId                String
+  tenant                  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repositoryId            String
+  repository              Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  pullRequestId           String
+  pullRequest             PullRequest   @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  githubCheckRunId        BigInt?
+  headSha                 String
+  status                  AnalysisRunStatus
+  verdict                 String?
+  confidence              Float?
+  summary                 String?
+  errorMessage            String?
+  retrievedContextSummary String?
+  rawResult               Json?
+  analyzerProvider        String?
+  promptVersion           String?
+  modelName               String?
+  analysisLatencyMs       Int?
+  fallbackUsed            Boolean       @default(false)
+  findings                Finding[]
+  startedAt               DateTime?
+  completedAt             DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([repositoryId])
+  @@index([pullRequestId])
+  @@index([headSha])
+  @@unique([pullRequestId, headSha])
+}
+
+model Finding {
+  id            String      @id @default(cuid())
+  analysisRunId String
+  analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+  title         String
+  severity      String
+  filePath      String?
+  startLine     Int?
+  endLine       Int?
+  evidence      Json
+  recommendation String
+  createdAt     DateTime    @default(now())
+
+  @@index([analysisRunId])
+}

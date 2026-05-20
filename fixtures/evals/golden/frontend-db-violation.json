@@ -1,0 +1,9 @@
+{
+  "expectedVerdict": "DRIFT_RISK",
+  "mustMentionFiles": [
+    "docs/adr/0002-frontend-must-not-import-db.md",
+    "src/frontend/components/UserCard.tsx"
+  ],
+  "mustHaveFindingSeverity": "HIGH"
+}
+

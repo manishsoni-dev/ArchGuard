@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: archguard-postgres
+    environment:
+      POSTGRES_USER: archguard
+      POSTGRES_PASSWORD: archguard
+      POSTGRES_DB: archguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - archguard-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U archguard -d archguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: archguard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - archguard-redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  archguard-postgres-data:
+  archguard-redis-data:

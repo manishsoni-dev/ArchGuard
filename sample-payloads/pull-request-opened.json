@@ -1,0 +1,20 @@
+{
+  "action": "opened",
+  "installation": {
+    "id": 123456
+  },
+  "repository": {
+    "id": 987654,
+    "name": "archguard-smoke-test",
+    "full_name": "example-org/archguard-smoke-test",
+    "owner": {
+      "login": "example-org"
+    }
+  },
+  "pull_request": {
+    "number": 1,
+    "head": {
+      "sha": "1111111111111111111111111111111111111111"
+    }
+  }
+}

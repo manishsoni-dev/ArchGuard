@@ -1,0 +1,38 @@
+{
+  "name": "archguard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered GitHub PR architecture fitness bot.",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @archguard/api dev",
+    "worker": "pnpm --filter @archguard/api worker",
+    "replay:webhook": "pnpm --filter @archguard/api replay:webhook",
+    "index:repo": "pnpm --filter @archguard/api index:repo",
+    "retrieval:test": "pnpm --filter @archguard/api retrieval:test",
+    "fixture:create": "pnpm --filter @archguard/api fixture:create",
+    "fixture:seed": "pnpm --filter @archguard/api fixture:seed",
+    "fixture:index": "pnpm --filter @archguard/api fixture:index",
+    "fixture:retrieval": "pnpm --filter @archguard/api fixture:retrieval",
+    "fixture:analyze": "pnpm --filter @archguard/api fixture:analyze",
+    "verify:phase3": "pnpm --filter @archguard/api verify:phase3",
+    "eval:rag": "pnpm --filter @archguard/api eval:rag",
+    "smoke:openai-rag": "pnpm --filter @archguard/api smoke:openai-rag",
+    "build": "pnpm -r build",
+    "test": "pnpm --filter @archguard/api test",
+    "typecheck": "pnpm -r typecheck",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "prisma": "^6.19.3",
+    "typescript": "^5.8.3"
+  }
+}

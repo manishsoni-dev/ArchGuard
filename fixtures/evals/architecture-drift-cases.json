@@ -1,0 +1,73 @@
+[
+  {
+    "name": "frontend importing db",
+    "description": "Frontend component adds a direct import from backend/db/client.",
+    "expectedVerdict": "DRIFT_RISK",
+    "golden": "frontend-db-violation",
+    "changedFiles": ["src/frontend/components/UserCard.tsx"],
+    "diff": "diff --git a/src/frontend/components/UserCard.tsx b/src/frontend/components/UserCard.tsx\n--- a/src/frontend/components/UserCard.tsx\n+++ b/src/frontend/components/UserCard.tsx\n@@ -1,4 +1,5 @@\n import type { UserSummary } from \"../api/user-api\";\n+import { db } from \"../../backend/db/client\";\n \n export type UserCardProps = {\n@@ -8,6 +9,7 @@ export type UserCardProps = {\n \n export function UserCard({ user }: UserCardProps) {\n+  void db;\n   return (\n"
+  },
+  {
+    "name": "clean frontend display change",
+    "description": "Frontend component changes presentation logic without changing dependencies.",
+    "expectedVerdict": "FIT",
+    "changedFiles": ["src/frontend/components/UserCard.tsx"],
+    "diff": "diff --git a/src/frontend/components/UserCard.tsx b/src/frontend/components/UserCard.tsx\n--- a/src/frontend/components/UserCard.tsx\n+++ b/src/frontend/components/UserCard.tsx\n@@ -6,7 +6,8 @@ export type UserCardProps = {\n };\n \n export function UserCard({ user }: UserCardProps) {\n+  const displayName = user.name.trim();\n   return (\n     <article>\n-      <h2>{user.name}</h2>\n+      <h2>{displayName}</h2>\n"
+  },
+  {
+    "name": "empty diff",
+    "description": "README hunk does not materially change source or architecture evidence.",
+    "expectedVerdict": "INSUFFICIENT_EVIDENCE",
+    "changedFiles": ["README.md"],
+    "diff": "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,3 @@\n # Layered App\n \n-Fixture repository.\n+Fixture repository.\n"
+  },
+  {
+    "name": "backend repository change following existing pattern",
+    "description": "Backend repository adds another database helper inside backend/db.",
+    "expectedVerdict": "FIT",
+    "changedFiles": ["src/backend/db/user-repository.ts"],
+    "diff": "diff --git a/src/backend/db/user-repository.ts b/src/backend/db/user-repository.ts\n--- a/src/backend/db/user-repository.ts\n+++ b/src/backend/db/user-repository.ts\n@@ -1,5 +1,9 @@\n import { db } from \"./client\";\n \n export async function findUserById(userId: string) {\n   return db.user.findUnique({ where: { id: userId } });\n }\n+\n+export async function findUsersByEmail(email: string) {\n+  return db.user.findMany({ where: { email } });\n+}\n"
+  },
+  {
+    "name": "frontend calling API client",
+    "description": "Frontend API helper calls the HTTP API boundary.",
+    "expectedVerdict": "FIT",
+    "changedFiles": ["src/frontend/api/user-api.ts"],
+    "diff": "diff --git a/src/frontend/api/user-api.ts b/src/frontend/api/user-api.ts\n--- a/src/frontend/api/user-api.ts\n+++ b/src/frontend/api/user-api.ts\n@@ -5,6 +5,11 @@ export type UserSummary = {\n   email: string;\n };\n \n+export async function fetchCurrentUser(): Promise<UserSummary> {\n+  const response = await fetch('/api/users/me');\n+  return response.json() as Promise<UserSummary>;\n+}\n+\n export async function fetchUser(userId: string): Promise<UserSummary> {\n"
+  },
+  {
+    "name": "backend service importing frontend module",
+    "description": "Backend service reverses dependency direction by importing a frontend component.",
+    "expectedVerdict": "DRIFT_RISK",
+    "changedFiles": ["src/backend/services/user-service.ts"],
+    "diff": "diff --git a/src/backend/services/user-service.ts b/src/backend/services/user-service.ts\n--- a/src/backend/services/user-service.ts\n+++ b/src/backend/services/user-service.ts\n@@ -1,4 +1,5 @@\n import { findUserById } from \"../db/user-repository\";\n+import { UserCard } from \"../../frontend/components/UserCard\";\n \n export async function getUserSummary(userId: string) {\n+  void UserCard;\n   return findUserById(userId);\n }\n"
+  },
+  {
+    "name": "new database helper inside backend db",
+    "description": "New database helper stays inside backend/db.",
+    "expectedVerdict": "FIT",
+    "changedFiles": ["src/backend/db/user-repository.ts"],
+    "diff": "diff --git a/src/backend/db/user-repository.ts b/src/backend/db/user-repository.ts\n--- a/src/backend/db/user-repository.ts\n+++ b/src/backend/db/user-repository.ts\n@@ -3,3 +3,7 @@ export async function findUserById(userId: string) {\n   return db.user.findUnique({ where: { id: userId } });\n }\n+\n+export async function deleteUserById(userId: string) {\n+  return db.user.delete({ where: { id: userId } });\n+}\n"
+  },
+  {
+    "name": "frontend importing backend service directly",
+    "description": "Frontend component bypasses API boundary by importing backend service code.",
+    "expectedVerdict": "DRIFT_RISK",
+    "changedFiles": ["src/frontend/components/UserCard.tsx"],
+    "diff": "diff --git a/src/frontend/components/UserCard.tsx b/src/frontend/components/UserCard.tsx\n--- a/src/frontend/components/UserCard.tsx\n+++ b/src/frontend/components/UserCard.tsx\n@@ -1,4 +1,5 @@\n import type { UserSummary } from \"../api/user-api\";\n+import { getUserSummary } from \"../../backend/services/user-service\";\n \n export type UserCardProps = {\n@@ -8,6 +9,7 @@ export type UserCardProps = {\n \n export function UserCard({ user }: UserCardProps) {\n+  void getUserSummary;\n   return (\n"
+  },
+  {
+    "name": "README only wording change",
+    "description": "Documentation wording only; current policy treats it as insufficient source evidence.",
+    "expectedVerdict": "INSUFFICIENT_EVIDENCE",
+    "changedFiles": ["README.md"],
+    "diff": "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,5 @@\n # Layered App\n \n Fixture repository for ArchGuard retrieval verification.\n+\n+This README explains the sample layered application.\n"
+  },
+  {
+    "name": "ADR only update",
+    "description": "ADR text changes without code impact; current policy returns insufficient evidence.",
+    "expectedVerdict": "INSUFFICIENT_EVIDENCE",
+    "changedFiles": ["docs/adr/0002-frontend-must-not-import-db.md"],
+    "diff": "diff --git a/docs/adr/0002-frontend-must-not-import-db.md b/docs/adr/0002-frontend-must-not-import-db.md\n--- a/docs/adr/0002-frontend-must-not-import-db.md\n+++ b/docs/adr/0002-frontend-must-not-import-db.md\n@@ -7,5 +7,6 @@ Frontend/ui files must not import db directly.\n ## Decision\n Files under frontend/ or ui/ must not import from db/ directly.\n+Frontend data loading should continue to use API boundaries.\n \n ## Consequences\n"
+  }
+]

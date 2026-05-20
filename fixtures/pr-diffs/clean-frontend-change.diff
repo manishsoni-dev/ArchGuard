@@ -1,0 +1,16 @@
+diff --git a/src/frontend/components/UserCard.tsx b/src/frontend/components/UserCard.tsx
+index 1111111..2222222 100644
+--- a/src/frontend/components/UserCard.tsx
++++ b/src/frontend/components/UserCard.tsx
+@@ -6,7 +6,8 @@ export type UserCardProps = {
+ };
+ 
+ export function UserCard({ user }: UserCardProps) {
++  const displayName = user.name.trim();
+   return (
+     <article>
+-      <h2>{user.name}</h2>
++      <h2>{displayName}</h2>
+       <p>{user.email}</p>
+     </article>
+   );

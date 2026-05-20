@@ -1,0 +1,48 @@
+{
+  "name": "@archguard/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "worker": "tsx watch src/jobs/worker.ts",
+    "replay:webhook": "tsx src/scripts/replay-webhook.ts",
+    "index:repo": "tsx src/scripts/index-repo.ts",
+    "retrieval:test": "tsx src/scripts/retrieval-test.ts",
+    "fixture:create": "tsx src/scripts/create-fixture-repo.ts",
+    "fixture:seed": "tsx src/scripts/seed-fixture-repository.ts",
+    "fixture:index": "tsx src/scripts/index-fixture-repo.ts",
+    "fixture:retrieval": "tsx src/scripts/verify-retrieval.ts",
+    "fixture:analyze": "tsx src/scripts/analyze-fixture-diff.ts",
+    "verify:phase3": "tsx src/scripts/verify-phase-3.ts",
+    "eval:rag": "tsx src/scripts/evaluate-rag.ts",
+    "smoke:openai-rag": "tsx src/scripts/smoke-test-openai-rag.ts",
+    "start": "node dist/src/server.js",
+    "start:worker": "node dist/src/jobs/worker.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema ../../prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@archguard/shared": "workspace:*",
+    "@octokit/auth-app": "^8.0.2",
+    "@octokit/rest": "^21.1.1",
+    "@prisma/client": "^6.19.3",
+    "bullmq": "^5.64.1",
+    "dotenv": "^16.5.0",
+    "fastify": "^5.3.3",
+    "ioredis": "^5.8.2",
+    "pino": "^9.14.0",
+    "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "prisma": "^6.19.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.4"
+  }
+}
