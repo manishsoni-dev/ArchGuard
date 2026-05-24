@@ -9,3 +9,9 @@ coverage
 .reports
 .tmp/
 .reports/
+.env
+.env.*
+*.pem
+.tmp/
+.reports/
+node_modules/

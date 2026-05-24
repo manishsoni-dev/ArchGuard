@@ -158,8 +158,12 @@ pnpm eval:rag
 pnpm smoke:openai-rag
 pnpm e2e:check
 pnpm inspect:pr -- owner=OWNER repo=REPO pr=NUMBER
+pnpm setup:github-app:interactive
 pnpm --silent setup:github-app --find-pem
 pnpm validate:github-app
+pnpm check:port -- 3000
+pnpm kill:port -- 3000 --yes
+pnpm doctor
 ```
 
 ## Health Checks
@@ -172,6 +176,26 @@ curl http://localhost:3000/ready
 `/health` only confirms that the API process is alive. `/ready` checks database connectivity, Redis connectivity, required environment variables, and whether the GitHub App private key is parseable enough to catch obvious configuration errors.
 
 In development, `/ready` also includes safe GitHub App diagnostics like `privateKey: "error"` without printing the private key, webhook secret, client secret, or tokens.
+
+## Recommended GitHub App Setup
+
+Use the interactive wizard instead of pasting PEM content or building the long setup command by hand:
+
+```bash
+pnpm setup:github-app:interactive
+pnpm validate:github-app
+pnpm dev
+```
+
+Then open:
+
+```text
+http://localhost:3000/ready
+```
+
+The wizard searches for downloaded `.pem` files, lets you select one, validates the private key, masks secrets in its output, backs up `.env`, and updates only the GitHub App-related settings. You still need the GitHub App ID, client ID, client secret, webhook secret, ngrok HTTPS URL, repository owner, and repository name from GitHub/ngrok.
+
+Do not manually paste PEM content unless necessary; pass or select the downloaded `.pem` file instead.
 
 ## GitHub App Private Key Setup
 
@@ -242,8 +266,9 @@ Expected successful shape:
     "webhookSecret": "ok",
     "clientId": "ok",
     "clientSecret": "ok",
-    "publicWebhookUrl": "ok",
-    "testRepo": "ok"
+    "webhookUrl": "ok",
+    "owner": "ok",
+    "repo": "ok"
   },
   "problems": [],
   "nextSteps": []
@@ -892,6 +917,43 @@ ADR scanner paths:
 - Check Run failure output is neutral in the MVP so ArchGuard remains advisory.
 
 ## Failure Mode Guide
+
+### Port 3000 Already In Use
+
+If `pnpm dev` reports `EADDRINUSE`:
+
+```bash
+pnpm check:port -- 3000
+pnpm kill:port -- 3000 --yes
+pnpm dev
+```
+
+`check:port` prints the process listening on the port. `kill:port` only targets processes listening on that port and asks for confirmation unless `--yes` is passed.
+
+### Interactive GitHub App Setup Exits Non-Zero
+
+The interactive setup wizard should prompt, write `.env`, print a masked summary, and exit `0` after success. If it exits non-zero:
+
+```bash
+pnpm validate:github-app
+pnpm doctor
+```
+
+Then rerun:
+
+```bash
+pnpm setup:github-app:interactive
+```
+
+### Secrets Exposed In Terminal
+
+If a terminal log accidentally contains a GitHub Client Secret, webhook secret, private key, or token:
+
+- Rotate the GitHub Client Secret.
+- Rotate the Webhook Secret.
+- Regenerate the GitHub App private key if the PEM was exposed.
+- Rerun `pnpm setup:github-app:interactive`.
+- Never share terminal logs containing secrets.
 
 If the webhook returns `401`:
 

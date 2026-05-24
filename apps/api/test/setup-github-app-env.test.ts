@@ -50,6 +50,16 @@ describe("setup-github-app-env", () => {
     );
 
     expect(result.status).toBe("error");
+    expect(result.message).toBe("Replace placeholder values with real GitHub App settings.");
+    expect(result.missingOrInvalid).toEqual([
+      "pem",
+      "appId",
+      "webhookSecret",
+      "clientId",
+      "clientSecret",
+      "webhookUrl"
+    ]);
+    expect(result.hint).toBe("Run pnpm setup:github-app:interactive for guided setup.");
     expect(result.messages.join("\n")).toContain("Replace the placeholder");
     expect(result.errors.join("\n")).toContain("appId must be the numeric GitHub App ID");
     expect(result.errors.join("\n")).toContain("pem must be the real absolute path");

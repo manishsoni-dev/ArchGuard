@@ -36,7 +36,7 @@ describe("validate-github-app-env", () => {
     );
 
     expect(result.status).toBe("error");
-    expect(result.checks.publicWebhookUrl).toBe("error");
+    expect(result.checks.webhookUrl).toBe("error");
   });
 
   it("accepts valid env fixture", async () => {

@@ -63,7 +63,7 @@ export async function buildServer(options: BuildServerOptions) {
   return fastify;
 }
 
-async function main(): Promise<void> {
+export async function startServer(): Promise<void> {
   const env = loadEnv();
   const queue = createAnalysisQueue(env.REDIS_URL);
   const readinessRedis = createRedisConnection(env.REDIS_URL);
@@ -84,7 +84,11 @@ async function main(): Promise<void> {
     }
   });
 
-  await server.listen({ port: env.PORT, host: "0.0.0.0" });
+  try {
+    await server.listen({ port: env.PORT, host: "0.0.0.0" });
+  } catch (error) {
+    throw friendlyListenError(error, env.PORT);
+  }
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -103,8 +107,38 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
 }
 
 if (process.env.NODE_ENV !== "test") {
-  void main().catch((error) => {
-    console.error(error);
+  void startServer().catch((error) => {
+    if (error instanceof FriendlyStartupError) {
+      console.error(error.message);
+    } else {
+      console.error(error);
+    }
     process.exit(1);
   });
+}
+
+export class FriendlyStartupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FriendlyStartupError";
+  }
+}
+
+export function friendlyListenError(error: unknown, port: number): Error {
+  if (isAddrInUseError(error)) {
+    return new FriendlyStartupError(
+      `Port ${port} is already in use. Stop the existing server or run: pnpm kill:port -- ${port} --yes`
+    );
+  }
+
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function isAddrInUseError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "EADDRINUSE"
+  );
 }

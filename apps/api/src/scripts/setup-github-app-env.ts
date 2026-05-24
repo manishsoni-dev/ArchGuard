@@ -41,10 +41,13 @@ const requiredSetupArgsSchema = setupArgsSchema.extend({
 });
 
 type SetupArgs = z.infer<typeof setupArgsSchema>;
-type RequiredSetupArgs = z.infer<typeof requiredSetupArgsSchema>;
+export type RequiredSetupArgs = z.infer<typeof requiredSetupArgsSchema>;
 
 export type SetupGitHubAppEnvResult = {
   status: "ok" | "error";
+  message?: string;
+  missingOrInvalid?: string[];
+  hint?: string;
   pemCandidates?: string[];
   outputFile?: string;
   envBackupFile?: string;
@@ -99,8 +102,12 @@ export async function runSetupGitHubAppEnv(rawArgs: string[], cwd = process.cwd(
 
   const setupErrors = validateSetupArgs(requiredArgs.data);
   if (setupErrors.length > 0) {
+    const missingOrInvalid = missingOrInvalidSetupFields(requiredArgs.data);
     return {
       status: "error",
+      message: "Replace placeholder values with real GitHub App settings.",
+      missingOrInvalid,
+      hint: "Run pnpm setup:github-app:interactive for guided setup.",
       messages: ["Replace the placeholder setup command values with real GitHub App settings."],
       errors: setupErrors
     };
@@ -248,13 +255,26 @@ export function mergeEnv(existingEnv: string, updates: Record<string, string>): 
   return `${trimmedRemaining ? `${trimmedRemaining}\n` : ""}${updateText}\n`;
 }
 
+export function buildGitHubEnvValues(args: RequiredSetupArgs, pem: string): Record<(typeof GITHUB_ENV_KEYS)[number], string> {
+  return {
+    GITHUB_APP_ID: args.appId,
+    GITHUB_PRIVATE_KEY: `"${toEscapedEnvPrivateKey(pem)}"`,
+    GITHUB_WEBHOOK_SECRET: args.webhookSecret,
+    GITHUB_CLIENT_ID: args.clientId,
+    GITHUB_CLIENT_SECRET: args.clientSecret,
+    PUBLIC_WEBHOOK_URL: args.webhookUrl,
+    TEST_GITHUB_OWNER: args.owner,
+    TEST_GITHUB_REPO: args.repo
+  };
+}
+
 function formatEnv(values: Record<string, string>): string {
   return `${Object.entries(values)
     .map(([key, value]) => `${key}=${value}`)
     .join("\n")}\n`;
 }
 
-async function findRepoRoot(cwd: string): Promise<string> {
+export async function findRepoRoot(cwd: string): Promise<string> {
   let current = path.resolve(cwd);
   for (;;) {
     try {
@@ -324,6 +344,50 @@ function validateSetupArgs(args: RequiredSetupArgs): string[] {
   return errors;
 }
 
+function missingOrInvalidSetupFields(args: RequiredSetupArgs): string[] {
+  const fields: string[] = [];
+
+  if (args.pem.includes("/absolute/path") || isPlaceholderValue("GITHUB_PRIVATE_KEY", args.pem)) {
+    fields.push("pem");
+  }
+  if (!/^\d+$/.test(args.appId) || isPlaceholderValue("GITHUB_APP_ID", args.appId)) {
+    fields.push("appId");
+  }
+  for (const [field, envField] of [
+    ["webhookSecret", "GITHUB_WEBHOOK_SECRET"],
+    ["clientId", "GITHUB_CLIENT_ID"],
+    ["clientSecret", "GITHUB_CLIENT_SECRET"]
+  ] as const) {
+    if (isPlaceholderValue(envField, args[field])) {
+      fields.push(field);
+    }
+  }
+  if (
+    isPlaceholderValue("PUBLIC_WEBHOOK_URL", args.webhookUrl) ||
+    !args.webhookUrl.startsWith("https://") ||
+    !urlLooksValid(args.webhookUrl)
+  ) {
+    fields.push("webhookUrl");
+  }
+  if (isPlaceholderValue("TEST_GITHUB_OWNER", args.owner)) {
+    fields.push("owner");
+  }
+  if (isPlaceholderValue("TEST_GITHUB_REPO", args.repo)) {
+    fields.push("repo");
+  }
+
+  return fields;
+}
+
+function urlLooksValid(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main(): Promise<void> {
   const result = await runSetupGitHubAppEnv(process.argv.slice(2));
   console.log(
@@ -333,6 +397,9 @@ async function main(): Promise<void> {
         pemCandidates: result.pemCandidates,
         outputFile: result.outputFile,
         envBackupFile: result.envBackupFile,
+        message: result.message,
+        missingOrInvalid: result.missingOrInvalid,
+        hint: result.hint,
         messages: result.messages,
         errors: result.errors
       },

@@ -27,8 +27,9 @@ export type GitHubAppEnvProblem = {
 export type GitHubAppEnvValidationResult = {
   status: "ok" | "error";
   checks: GitHubAppDiagnosticChecks & {
-    publicWebhookUrl: "ok" | "error";
-    testRepo: "ok" | "error";
+    webhookUrl: "ok" | "error";
+    owner: "ok" | "error";
+    repo: "ok" | "error";
   };
   problems: GitHubAppEnvProblem[];
   nextSteps: string[];
@@ -99,9 +100,9 @@ export function validateGitHubAppEnv(input: GitHubAppEnvInput): GitHubAppEnvVali
     webhookSecret: hasProblem(problems, "GITHUB_WEBHOOK_SECRET") ? "error" : "ok",
     clientId: hasProblem(problems, "GITHUB_CLIENT_ID") ? "error" : "ok",
     clientSecret: hasProblem(problems, "GITHUB_CLIENT_SECRET") ? "error" : "ok",
-    publicWebhookUrl: hasProblem(problems, "PUBLIC_WEBHOOK_URL") ? "error" : "ok",
-    testRepo:
-      hasProblem(problems, "TEST_GITHUB_OWNER") || hasProblem(problems, "TEST_GITHUB_REPO") ? "error" : "ok"
+    webhookUrl: hasProblem(problems, "PUBLIC_WEBHOOK_URL") ? "error" : "ok",
+    owner: hasProblem(problems, "TEST_GITHUB_OWNER") ? "error" : "ok",
+    repo: hasProblem(problems, "TEST_GITHUB_REPO") ? "error" : "ok"
   } satisfies GitHubAppEnvValidationResult["checks"];
 
   return {
