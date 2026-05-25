@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://archguard:archguard@localhost:5432/archguard?schema=public
+      REDIS_URL: redis://localhost:6379
+      GITHUB_APP_ID: "1"
+      GITHUB_PRIVATE_KEY: "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAMwjJgqB4x1vR6fZ+eCU4HzZq9o3WZq5EVtrmByyFhQZ1J1JtQm3\n4KlGLuVpP+o0FFqXAvRK2g4B1lJfrgWrTQ8CAwEAAQJBALPZgWsrHdpO8+IMoU7M\nYEF+fGkxGC6REuSqaU6mHqPdrVOWzo6yFx/TuCy9+vrqM6kEU6lCFmT9m6YNtPu1\n+wECIQDufrJHhGq6HOSWtmvlq+a+rcc8dFKGp+4aBCP8+hdeAQIhANup6fSd8fbn\nLllZ2pI4i36O8u2GY4vOwbIq7VbJdqtVAiB0dg8v1Zrmq0gPRbRZ0nREsN0bkYuI\n0ksl1dcOBQi7gQIgS2hz5vQ+SdnmEHPt2nUJwqBWfX6f4KVHVsaMM++XBxECIQDe\nQd37VRzYvY+szJ8S8tiCcYPC1u2WtnUnHnU6FAowzA==\n-----END RSA PRIVATE KEY-----"
+      GITHUB_WEBHOOK_SECRET: test-webhook-secret
+      GITHUB_CLIENT_ID: test-client-id
+      GITHUB_CLIENT_SECRET: test-client-secret
+      DEV_WEBHOOK_TOKEN: test-dev-webhook-token
+      ANALYZER_PROVIDER: mock
+      LLM_PROVIDER: mock
+      EMBEDDING_PROVIDER: fake
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
+
+      - name: Validate Prisma schema
+        run: pnpm exec prisma validate --schema prisma/schema.prisma
+
+      - name: Test
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
