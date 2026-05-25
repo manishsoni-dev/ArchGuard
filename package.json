@@ -33,6 +33,7 @@
     "check:port": "pnpm --filter @archguard/api check:port",
     "kill:port": "pnpm --filter @archguard/api kill:port",
     "doctor": "pnpm --filter @archguard/api doctor",
+    "verify:local": "node scripts/verify-local.mjs",
     "build": "pnpm -r build",
     "test": "pnpm --filter @archguard/api test",
     "typecheck": "pnpm -r typecheck",

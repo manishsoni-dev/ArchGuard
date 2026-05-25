@@ -1,79 +1,103 @@
 # ArchGuard
 
-ArchGuard is an AI-powered GitHub PR review bot focused on architecture fitness. It is not a generic code reviewer: it evaluates whether a pull request fits a repository's existing architecture, conventions, module boundaries, and documented architecture decisions.
+ArchGuard is an AI-powered GitHub PR bot that checks whether new code fits a repository's architecture.
 
-## Current MVP
+## Problem
 
-This vertical slice includes:
+AI-generated code can compile, pass unit tests, and still damage a codebase. The common failure mode is not syntax. It is architectural drift: bypassed layers, inverted dependencies, ignored ADRs, and changes that do not match the conventions already present in the repository.
 
-- `POST /webhooks/github` for GitHub webhook intake.
-- Raw-body HMAC verification for `x-hub-signature-256`.
-- Header validation for `x-github-event`, `x-github-delivery`, and `x-hub-signature-256`.
-- Durable webhook event persistence with `x-github-delivery` idempotency.
-- BullMQ queue named `archguard-analysis`.
-- Separate API and worker processes.
-- Pull request routing for `opened`, `synchronize`, and `reopened`.
-- AnalysisRun lifecycle: `QUEUED`, `IN_PROGRESS`, `COMPLETED`, `FAILED`.
-- GitHub App installation authentication using Octokit.
-- Check Run creation and completion for **ArchGuard Architecture Fitness**.
-- Repository indexing that clones or pulls a repository, scans source files, chunks content, and stores chunks in Postgres.
-- Deterministic fake embeddings for local development.
-- Placeholder retriever and mock architecture analyzer.
-- Pino structured logging with delivery, repository, PR, tenant, installation, analysis run, and job fields where available.
-- `/health` and `/ready` endpoints for local integration checks.
-- Development-only webhook replay endpoint at `POST /dev/github-webhook-debug`.
+ArchGuard reviews pull requests against repository-specific architecture context instead of generic style rules. It is designed to answer a focused question:
 
-## Not Included Yet
+> Does this PR fit how this codebase is supposed to be built?
 
-This MVP intentionally does not include:
+## Why It Matters
 
-- Frontend dashboard.
-- Authentication UI.
-- Billing.
-- Kubernetes.
-- Neo4j or graph analysis.
-- Real OpenAI or LLM API calls.
-- pgvector similarity search.
-- Advanced RAG.
+Most automated review tools look for generic defects: lint issues, test failures, security patterns, or broad code smells. ArchGuard adds a different signal. It retrieves architecture decisions, source examples, and nearby code patterns, then posts a GitHub Check Run with a typed architecture verdict:
 
-## Local Setup
+- `FIT`
+- `DRIFT_RISK`
+- `INSUFFICIENT_EVIDENCE`
+
+The result is advisory in this local MVP, but the workflow is real: GitHub webhook to durable job to repository indexing to retrieval to analysis to Check Run.
+
+## Core Features
+
+- GitHub App webhook integration with signature verification.
+- Pull request event routing for opened, reopened, and synchronize events.
+- Durable webhook persistence with delivery-id idempotency.
+- BullMQ and Redis worker pipeline for retryable PR analysis.
+- Repository indexing for code and architecture documents.
+- ADR ingestion from common `docs/adr` and architecture paths.
+- pgvector-backed retrieval foundation for code and document chunks.
+- Hybrid retrieval over changed files, ADRs, semantic search, and keyword fallback.
+- Typed RAG analyzer with mock LLM mode by default.
+- GitHub Check Run output with verdict, confidence, findings, evidence files, and advisory note.
+- Local eval harness for architecture drift cases.
+- Fixture repository verification for indexing, embeddings, retrieval, and analysis.
+- Diagnostic commands for webhooks, queue state, analysis runs, ports, and GitHub App setup.
+
+## Live Proof
+
+This repository has been verified end-to-end as a real GitHub App against `Manisshhhhhh/ArchGuard`.
+
+- PR #1: `DRIFT_RISK` for a frontend file importing the database layer directly.
+- PR #2: `FIT` for a normal diagnostic maintenance change.
+- PR #3: `FIT` for test discovery cleanup.
+
+Screenshot placeholders:
+
+- `docs/screenshots/pr-drift-risk.png`
+- `docs/screenshots/pr-fit.png`
+
+Add real screenshots there when preparing a portfolio page or interview deck.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  github["GitHub PR"] --> webhook["POST /webhooks/github"]
+  webhook --> api["Fastify API"]
+  api --> events["Postgres WebhookEvent"]
+  api --> queue["BullMQ archguard-analysis"]
+  queue --> worker["Worker process"]
+  worker --> indexer["Repository indexer"]
+  indexer --> chunks["CodeChunk + ArchitectureDocument"]
+  chunks --> vector["Postgres + pgvector"]
+  worker --> retrieval["Hybrid retrieval"]
+  vector --> retrieval
+  retrieval --> analyzer["Typed RAG analyzer"]
+  analyzer --> runs["AnalysisRun + Finding"]
+  analyzer --> checks["GitHub Check Run"]
+```
+
+See [docs/architecture.md](docs/architecture.md) for the deeper technical walkthrough.
+
+## Tech Stack
+
+- TypeScript
+- Node.js 22+
+- Fastify
+- Prisma ORM
+- PostgreSQL with pgvector
+- Redis
+- BullMQ
+- GitHub App API and Octokit
+- Zod
+- Vitest
+- pnpm workspace
+
+## Local Quickstart
 
 Requirements:
 
 - Node.js 22+
-- pnpm 10+
-- Docker Desktop or another Docker runtime
-- A GitHub App for live webhook testing
-
-Install dependencies:
-
-```bash
-pnpm install
-```
-
-If `pnpm` is not installed locally:
-
-```bash
-npx pnpm@10.11.0 install
-```
-
-Create your environment file:
-
-```bash
-cp .env.example .env
-```
-
-Start Postgres and Redis:
+- pnpm
+- Docker Desktop or compatible Docker runtime
+- ngrok for real GitHub webhook testing
 
 ```bash
 docker compose up -d postgres redis
-```
-
-The local Postgres service uses `pgvector/pgvector:pg16` so the `vector` extension is available for semantic retrieval.
-
-Generate the Prisma client and run migrations:
-
-```bash
+pnpm install
 pnpm prisma:generate
 pnpm prisma:migrate
 ```
@@ -88,946 +112,140 @@ pnpm dev
 pnpm worker
 ```
 
-The webhook endpoint is:
-
-```text
-POST http://localhost:3000/webhooks/github
-```
-
-## Environment Variables
-
-| Variable | Purpose |
-| --- | --- |
-| `PORT` | API server port. Defaults to `3000` in `.env.example`. |
-| `DATABASE_URL` | PostgreSQL connection string used by Prisma. |
-| `REDIS_URL` | Redis connection string used by BullMQ. |
-| `GITHUB_APP_ID` | Numeric GitHub App ID. |
-| `GITHUB_PRIVATE_KEY` | GitHub App private key. Newlines may be escaped as `\n`. |
-| `GITHUB_WEBHOOK_SECRET` | Shared secret used to verify GitHub webhook signatures. |
-| `GITHUB_CLIENT_ID` | GitHub App client ID, reserved for later OAuth flows. |
-| `GITHUB_CLIENT_SECRET` | GitHub App client secret, reserved for later OAuth flows. |
-| `DEV_WEBHOOK_TOKEN` | Local-only token for `POST /dev/github-webhook-debug`. Never use this as production auth. |
-| `EMBEDDING_PROVIDER` | `fake` by default. Set to `openai` only when real embeddings are wanted. |
-| `OPENAI_API_KEY` | Optional. Required only when `EMBEDDING_PROVIDER=openai`. |
-| `EMBEDDING_MODEL` | Defaults to `text-embedding-3-small`. |
-| `EMBEDDING_DIMENSIONS` | Defaults to `1536`; must match the pgvector column dimension until a migration changes it. |
-| `EMBEDDING_BATCH_SIZE` | Defaults to `64`. |
-| `RETRIEVAL_TOP_K` | Defaults to `12`. |
-| `RETRIEVAL_MAX_CONTEXT_CHARS` | Defaults to `20000`. |
-| `LLM_PROVIDER` | `mock` by default. Set to `openai` only when real RAG analysis should call OpenAI. |
-| `LLM_MODEL` | Defaults to `gpt-4o-mini`. |
-| `LLM_TIMEOUT_MS` | Defaults to `30000`; applies to LLM calls. |
-| `LLM_MAX_OUTPUT_TOKENS` | Defaults to `1200`. |
-| `ANALYZER_PROVIDER` | `mock` by default. Set to `rag` to use the retrieval-augmented analyzer. |
-| `RAG_FALLBACK_TO_MOCK` | Defaults to `true`; if RAG LLM calls fail, ArchGuard falls back to deterministic mock analysis. |
-| `RAG_PROMPT_VERSION` | Defaults to `archguard-rag-v1`. |
-| `RAG_MAX_CONTEXT_CHARS` | Defaults to `20000`; caps context inserted into RAG prompts. |
-| `DEBUG_RAG_PROMPTS` | Defaults to `false`; when true, prompt text is logged at debug level. Do not enable with sensitive repos unless logs are protected. |
-| `RAG_WRITE_EVAL_REPORT` | Defaults to `false`; when true, writes timestamped RAG eval JSON to `.reports/rag-evals`. |
-| `RAG_VALIDATE_GOLDEN` | Defaults to `false`; when true, validates minimal golden expectations in `fixtures/evals/golden`. |
-| `SMOKE_FAIL_ON_FALLBACK` | Defaults to `true`; OpenAI smoke tests fail if RAG falls back to mock. |
-| `LLM_INPUT_COST_PER_1M_TOKENS` | Optional approximate input token cost for eval reporting. Not treated as authoritative pricing. |
-| `LLM_OUTPUT_COST_PER_1M_TOKENS` | Optional approximate output token cost for eval reporting. Not treated as authoritative pricing. |
-| `PUBLIC_WEBHOOK_URL` | Public ngrok or tunnel base URL used for GitHub App webhook setup. |
-| `TEST_GITHUB_OWNER` | Owner for the test repository used by Phase 5 checks. |
-| `TEST_GITHUB_REPO` | Repository name used by Phase 5 checks. |
-| `TEST_GITHUB_PR_NUMBER` | Optional PR number for local inspection. |
-| `TEST_GITHUB_INSTALLATION_ID` | Optional GitHub App installation ID for PR inspection. |
-| `NODE_ENV` | `development`, `test`, or `production`. |
-
-## Commands
+Expose the local API for GitHub webhooks:
 
 ```bash
-pnpm dev
-pnpm worker
+ngrok http 3000
+```
+
+Health checks:
+
+```bash
+curl http://localhost:3000/health
+curl http://localhost:3000/ready
+```
+
+For ngrok free-tier browser warnings, terminal checks can include:
+
+```bash
+curl -H "ngrok-skip-browser-warning: true" https://YOUR-NGROK-DOMAIN.ngrok-free.dev/ready
+```
+
+## Verification Commands
+
+Use the one-command local verification:
+
+```bash
+pnpm verify:local
+```
+
+Or run the gates individually:
+
+```bash
 pnpm test
 pnpm typecheck
 pnpm build
-pnpm prisma:generate
-pnpm prisma:migrate
-pnpm replay:webhook -- ./sample-payloads/pull-request-opened.json
-pnpm index:repo -- tenantId=<tenant-id> repositoryId=<repo-id> cloneUrl=https://github.com/org/repo.git fullName=org/repo
-pnpm retrieval:test -- tenantId=<tenant-id> repositoryId=<repo-id> query="frontend must not import database"
-pnpm fixture:create
-pnpm fixture:seed
-pnpm fixture:index
-pnpm fixture:retrieval
-pnpm fixture:analyze -- fixtures/pr-diffs/frontend-db-violation.diff
 pnpm verify:phase3
-pnpm eval:rag
-pnpm smoke:openai-rag
-pnpm e2e:check
-pnpm inspect:pr -- owner=OWNER repo=REPO pr=NUMBER
-pnpm setup:github-app:interactive
-pnpm --silent setup:github-app --find-pem
-pnpm validate:github-app
-pnpm check:port -- 3000
-pnpm kill:port -- 3000 --yes
-pnpm doctor
-```
-
-## Health Checks
-
-```bash
-curl http://localhost:3000/health
-curl http://localhost:3000/ready
-```
-
-`/health` only confirms that the API process is alive. `/ready` checks database connectivity, Redis connectivity, required environment variables, and whether the GitHub App private key is parseable enough to catch obvious configuration errors.
-
-In development, `/ready` also includes safe GitHub App diagnostics like `privateKey: "error"` without printing the private key, webhook secret, client secret, or tokens.
-
-## Recommended GitHub App Setup
-
-Use the interactive wizard instead of pasting PEM content or building the long setup command by hand:
-
-```bash
-pnpm setup:github-app:interactive
-pnpm validate:github-app
-pnpm dev
-```
-
-Then open:
-
-```text
-http://localhost:3000/ready
-```
-
-The wizard searches for downloaded `.pem` files, lets you select one, validates the private key, masks secrets in its output, backs up `.env`, and updates only the GitHub App-related settings. You still need the GitHub App ID, client ID, client secret, webhook secret, ngrok HTTPS URL, repository owner, and repository name from GitHub/ngrok.
-
-Do not manually paste PEM content unless necessary; pass or select the downloaded `.pem` file instead.
-
-## GitHub App Private Key Setup
-
-The common local setup failure is leaving placeholder GitHub App values in `.env`. The helper scripts below validate the downloaded PEM and write an `.env`-compatible escaped newline value without printing the key.
-
-### A. Generate Private Key Manually
-
-Go to:
-
-```text
-GitHub → Settings → Developer settings → GitHub Apps → ArchGuard → Private keys → Generate a private key
-```
-
-GitHub downloads a `.pem` file. Keep it local and do not commit it.
-
-### B. Find Downloaded File
-
-```bash
-ls ~/Downloads/*.pem
-pnpm --silent setup:github-app --find-pem
-```
-
-The finder prints candidate file paths only. It does not read or print PEM contents.
-
-### C. Generate `.env` Snippet
-
-```bash
-pnpm --silent setup:github-app -- pem=/Users/you/Downloads/archguard.private-key.pem appId=123456 webhookSecret=... clientId=... clientSecret=... webhookUrl=https://abc.ngrok-free.app owner=mmanishsoni70 repo=archguard-test
-```
-
-Using `--silent` keeps pnpm from echoing CLI arguments that may contain secrets. The script itself never prints private keys or secret values. This writes `.env.github.local` with:
-
-```env
-GITHUB_APP_ID=...
-GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-GITHUB_WEBHOOK_SECRET=...
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
-PUBLIC_WEBHOOK_URL=...
-TEST_GITHUB_OWNER=...
-TEST_GITHUB_REPO=...
-```
-
-The script prints only status messages such as `PEM file found`, `Private key parse: ok`, and `.env.github.local written`.
-
-To update `.env` automatically while preserving unrelated values like `DATABASE_URL`, `REDIS_URL`, and `ANALYZER_PROVIDER`, add:
-
-```bash
---write-env=true
-```
-
-When `--write-env=true` is used, the script first creates `.env.backup.TIMESTAMP`.
-
-### D. Validate Active `.env`
-
-```bash
-pnpm validate:github-app
-```
-
-Expected successful shape:
-
-```json
-{
-  "status": "ok",
-  "checks": {
-    "appId": "ok",
-    "privateKey": "ok",
-    "webhookSecret": "ok",
-    "clientId": "ok",
-    "clientSecret": "ok",
-    "webhookUrl": "ok",
-    "owner": "ok",
-    "repo": "ok"
-  },
-  "problems": [],
-  "nextSteps": []
-}
-```
-
-The validator rejects obvious placeholders such as `123456`, `PASTE_REAL_KEY_LINES_HERE`, `your_...`, `...`, `KEY=...`, and `https://your_real-ngrok-url...`.
-
-### E. Restart API And Check Readiness
-
-```bash
-pnpm dev
-curl http://localhost:3000/ready
-```
-
-When the key and GitHub App settings are valid, `/ready` should report `githubApp: "ok"`.
-
-## Workflow
-
-1. GitHub sends a webhook to `POST /webhooks/github`.
-2. The API validates required GitHub headers and verifies the signature against the raw body.
-3. The API writes a `WebhookEvent`.
-4. Duplicate `x-github-delivery` values return `202 already_received` and do not enqueue another job.
-5. Unsupported events are persisted as `IGNORED`.
-6. Supported PR events upsert tenant, repository, pull request, and a `QUEUED` `AnalysisRun`.
-7. The API enqueues an `archguard-analysis` BullMQ job and returns `202 Accepted`.
-8. The worker validates the job payload with Zod.
-9. The worker creates an in-progress GitHub Check Run, marks the run `IN_PROGRESS`, indexes the repository, retrieves placeholder context, runs the mock analyzer, stores findings, and completes the Check Run.
-10. Failed final attempts are persisted as `FAILED`. If a Check Run exists, the worker updates it with neutral failure output.
-
-## Local GitHub Webhook Testing
-
-Expose the local API with ngrok:
-
-```bash
-ngrok http 3000
-```
-
-Configure your GitHub App webhook URL:
-
-```text
-https://<your-ngrok-subdomain>.ngrok-free.app/webhooks/github
-```
-
-In the GitHub App settings:
-
-- Set the webhook secret to match `GITHUB_WEBHOOK_SECRET`.
-- Subscribe to `Pull request` events.
-- Grant repository contents read access for indexing.
-- Grant pull requests read access for metadata and files.
-- Grant checks read/write access for Check Run creation and updates.
-- Install the app on a test repository.
-
-To test GitHub redelivery, open the GitHub App's Recent Deliveries view, select a delivery, and click **Redeliver**. The second delivery with the same `x-github-delivery` should be persisted once and return `already_received` without adding another BullMQ job.
-
-## Local Webhook Replay
-
-For local debugging without GitHub signatures, start the API and worker, then run:
-
-```bash
-pnpm replay:webhook -- ./sample-payloads/pull-request-opened.json
-pnpm replay:webhook -- ./sample-payloads/pull-request-synchronize.json
-```
-
-The replay script posts to `POST /dev/github-webhook-debug` with `x-archguard-dev-token: DEV_WEBHOOK_TOKEN`. This endpoint is only registered when `NODE_ENV !== "production"`.
-
-## Local Real GitHub App Smoke Test
-
-1. Install dependencies:
-
-```bash
-pnpm install
-```
-
-2. Start Postgres and Redis:
-
-```bash
-docker compose up -d postgres redis
-```
-
-3. Run Prisma migration:
-
-```bash
-pnpm prisma:generate
-pnpm prisma:migrate
-```
-
-4. Start the API:
-
-```bash
-pnpm dev
-```
-
-5. Start the worker in another terminal:
-
-```bash
-pnpm worker
-```
-
-6. Run health checks:
-
-```bash
-curl http://localhost:3000/health
-curl http://localhost:3000/ready
-```
-
-7. Expose the API:
-
-```bash
-ngrok http 3000
-```
-
-8. Configure the GitHub App webhook URL:
-
-```text
-https://<your-ngrok-subdomain>.ngrok-free.app/webhooks/github
-```
-
-9. In GitHub App settings, confirm:
-
-- Webhook secret matches `GITHUB_WEBHOOK_SECRET`.
-- Pull request events are subscribed.
-- Contents read permission is enabled.
-- Pull requests read permission is enabled.
-- Checks read/write permission is enabled.
-- The app is installed on the test repository.
-
-10. Create or update a test PR.
-
-11. Verify the webhook was received:
-
-- Check the API logs for `GitHub pull_request webhook enqueued for architecture analysis`.
-- Check GitHub App Recent Deliveries for a `202` response.
-
-12. Verify database rows exist:
-
-```bash
-pnpm prisma studio
-```
-
-Inspect `WebhookEvent`, `Repository`, `PullRequest`, `AnalysisRun`, and `Finding`.
-
-13. Verify BullMQ job processing:
-
-```bash
-redis-cli keys 'bull:archguard-analysis:*'
-redis-cli zrange bull:archguard-analysis:completed 0 -1
-redis-cli zrange bull:archguard-analysis:failed 0 -1
-```
-
-14. Verify the GitHub Check Run appears on the PR under **Checks** as **ArchGuard Architecture Fitness**.
-
-15. Test GitHub redelivery from the GitHub App Recent Deliveries page.
-
-16. Confirm duplicate delivery behavior:
-
-- The API returns `202 already_received`.
-- No duplicate BullMQ job is enqueued.
-- `WebhookEvent.githubDeliveryId` remains unique.
-
-## Inspecting Redis and BullMQ
-
-With Redis running locally:
-
-```bash
-redis-cli keys 'bull:archguard-analysis:*'
-redis-cli llen bull:archguard-analysis:wait
-redis-cli zrange bull:archguard-analysis:failed 0 -1
-```
-
-For a richer local UI, you can point any BullMQ-compatible inspector at `redis://localhost:6379` and the queue name `archguard-analysis`.
-
-## Database Inspection
-
-Open Prisma Studio:
-
-```bash
-pnpm prisma studio
-```
-
-Useful tables:
-
-- `WebhookEvent`: delivery idempotency, event status, raw sanitized payload JSON.
-- `Repository`: GitHub repository identity and clone URL.
-- `PullRequest`: PR number, title, head SHA, and state.
-- `IndexedFile`: indexed file paths, content hashes, file types, and last indexed time.
-- `CodeChunk`: code/doc/ADR chunks, embedding status, model, and pgvector-backed embedding column.
-- `ArchitectureDocument`: detected ADRs, READMEs, and design docs.
-- `AnalysisRun`: queued/in-progress/completed/failed lifecycle, verdict, Check Run ID, and errors.
-- `Finding`: analyzer findings linked to completed runs.
-
-## Indexing And Retrieval
-
-Repository indexing is incremental:
-
-- Files are scanned while ignoring `.git`, `node_modules`, `dist`, `build`, `coverage`, and lock files.
-- Each file gets a content hash.
-- Unchanged files are skipped and their chunks are preserved.
-- Changed files have chunks rebuilt and re-embedded.
-- Deleted files are removed with cascading chunks.
-- Markdown architecture documents are detected and stored in `ArchitectureDocument`.
-
-Chunking is heuristic for now:
-
-- TypeScript/JavaScript splits on exported functions, classes, interfaces, types, and constants.
-- Python splits on `def`, `async def`, and `class`.
-- Markdown splits by headings.
-- Other files fall back to line windows.
-
-Retrieval is hybrid:
-
-- Always include chunks from changed files when available.
-- Include ADR chunks.
-- Include pgvector semantic matches from `CodeChunk.embeddingVector`.
-- Fall back to keyword search if vector retrieval is unavailable.
-- Cap total context with `RETRIEVAL_TOP_K` and `RETRIEVAL_MAX_CONTEXT_CHARS`.
-
-The worker indexes the repository and generates embeddings before calling the selected analyzer. The default remains the deterministic mock analyzer; `ANALYZER_PROVIDER=rag` enables the Phase 4 RAG analyzer.
-
-## Phase 3 Local Retrieval Verification
-
-Use this workflow to prove the local pgvector/indexing/retrieval path without GitHub:
-
-```bash
-docker compose up -d postgres redis
-pnpm prisma:migrate
-pnpm fixture:create
-pnpm fixture:seed
-pnpm fixture:index
-pnpm fixture:retrieval
-EXPECT_VERDICT=DRIFT_RISK pnpm fixture:analyze -- fixtures/pr-diffs/frontend-db-violation.diff
-pnpm verify:phase3
-```
-
-The fixture repository is generated under:
-
-```text
-.tmp/fixture-repos/layered-app
-```
-
-It contains a clean layered TypeScript app plus ADRs:
-
-- `docs/adr/0001-layered-architecture.md`
-- `docs/adr/0002-frontend-must-not-import-db.md`
-- `src/frontend/components/UserCard.tsx`
-- `src/frontend/api/user-api.ts`
-- `src/backend/services/user-service.ts`
-- `src/backend/db/client.ts`
-- `src/backend/db/user-repository.ts`
-
-PR-like diff fixtures live in:
-
-```text
-fixtures/pr-diffs/
-  clean-frontend-change.diff
-  frontend-db-violation.diff
-  empty-change.diff
-```
-
-Expected analyzer checks:
-
-```bash
-EXPECT_VERDICT=FIT pnpm fixture:analyze -- fixtures/pr-diffs/clean-frontend-change.diff
-EXPECT_VERDICT=DRIFT_RISK pnpm fixture:analyze -- fixtures/pr-diffs/frontend-db-violation.diff
-EXPECT_VERDICT=INSUFFICIENT_EVIDENCE pnpm fixture:analyze -- fixtures/pr-diffs/empty-change.diff
-```
-
-`pnpm verify:phase3` prints a report like:
-
-```text
-ARCHGUARD PHASE 3 VERIFICATION
-
-Database: ok
-pgvector extension: ok
-Fixture repo: ok
-Architecture documents: 2
-ADR chunks: N
-Code chunks: N
-Embeddings embedded: N
-Retrieval checks: passed
-Analyzer checks:
-- clean change: FIT
-- frontend db violation: DRIFT_RISK
-- empty change: INSUFFICIENT_EVIDENCE
-
-Overall: PASSED
-```
-
-Phase 3 troubleshooting:
-
-- pgvector extension missing: confirm Docker Compose uses `pgvector/pgvector:pg16`, then recreate Postgres if an old `postgres:16-alpine` image initialized the volume.
-- `embeddingVector` column missing: run `pnpm prisma:migrate` and inspect migration `20260519093000_pgvector_retrieval_adr_ingestion`.
-- Zero ADR chunks: run `pnpm fixture:create`, confirm ADR markdown files exist under `.tmp/fixture-repos/layered-app/docs/adr`, then run `pnpm fixture:index`.
-- Zero embedded chunks: confirm `EMBEDDING_PROVIDER=fake` for local verification and check `CodeChunk.embeddingStatus`.
-- Retrieval does not return ADR 0002: inspect `CodeChunk` rows where `chunkType=ADR`, then run `pnpm fixture:retrieval`.
-- Analyzer returns `FIT` when `DRIFT_RISK` is expected: confirm the diff contains an added import from `backend/db/client` inside `src/frontend/components/UserCard.tsx`.
-
-## Phase 4: Real RAG Analyzer
-
-Phase 4 adds a retrieval-augmented analyzer behind a provider switch. It builds an architecture-specific prompt from PR diff, changed files, ADR chunks, changed-file chunks, and semantically similar code chunks. The LLM must return strict JSON matching `ArchitectureAnalysisResult`; invalid JSON is retried once with a repair prompt. If repair still fails, ArchGuard returns `INSUFFICIENT_EVIDENCE` instead of crashing the worker.
-
-Mock RAG mode is deterministic and requires no network:
-
-```bash
 ANALYZER_PROVIDER=rag LLM_PROVIDER=mock pnpm eval:rag
-ANALYZER_PROVIDER=rag LLM_PROVIDER=mock EXPECT_VERDICT=DRIFT_RISK pnpm fixture:analyze -- fixtures/pr-diffs/frontend-db-violation.diff
+ANALYZER_PROVIDER=rag LLM_PROVIDER=mock pnpm e2e:check
+pnpm exec prisma validate --schema prisma/schema.prisma
 ```
 
-OpenAI RAG mode is opt-in:
+`verify:phase3` requires the local Postgres and Redis services. It proves fixture repository creation, ADR ingestion, indexing, fake embeddings, pgvector storage, retrieval checks, and analyzer fixture checks.
 
-```bash
-ANALYZER_PROVIDER=rag LLM_PROVIDER=openai OPENAI_API_KEY=... pnpm eval:rag
-```
+## Real GitHub PR Demo
 
-Fallback behavior:
+1. Create a GitHub App.
+2. Set the webhook URL to:
 
-- `ANALYZER_PROVIDER=mock` keeps the Phase 2/3 deterministic analyzer.
-- `ANALYZER_PROVIDER=rag LLM_PROVIDER=mock` runs the RAG prompt and strict-output pipeline with a deterministic mock LLM.
-- `ANALYZER_PROVIDER=rag LLM_PROVIDER=openai` calls OpenAI chat completions with JSON output mode, timeout, and max token limits.
-- If the RAG LLM call fails and `RAG_FALLBACK_TO_MOCK=true`, ArchGuard logs a warning, runs the mock analyzer, and records `fallbackUsed=true` on `AnalysisRun`.
-- Full prompts are not logged unless `DEBUG_RAG_PROMPTS=true`.
-- GitHub Check Runs show verdict, confidence, analyzer provider, model, fallback status, retrieved context summary, findings, evidence references, and the advisory note. They do not dump full prompts or retrieved context.
+   ```text
+   PUBLIC_WEBHOOK_URL + /webhooks/github
+   ```
 
-Evaluation fixtures live at:
+3. Configure minimum permissions:
+   - Contents: Read-only
+   - Pull requests: Read-only
+   - Checks: Read and write
+   - Metadata: Read-only
+4. Subscribe to the `pull_request` event.
+5. Install the app on the test repository.
+6. Run the API, worker, Docker services, and ngrok.
+7. Validate local readiness:
 
-```text
-fixtures/evals/architecture-drift-cases.json
-```
+   ```bash
+   ANALYZER_PROVIDER=rag LLM_PROVIDER=mock pnpm e2e:check
+   ```
 
-The eval pack covers frontend-to-db drift, clean frontend changes, empty diffs, backend repository changes, frontend API client changes, and backend-service-to-frontend dependency drift.
+8. Create a PR that introduces an architecture violation, for example a frontend file importing from `backend/db`.
+9. Inspect diagnostics:
 
-## Phase 4.5: Real LLM Smoke Test and RAG Eval Reports
+   ```bash
+   pnpm webhook:events
+   pnpm queue:inspect
+   pnpm analysis:runs
+   ```
 
-Phase 4.5 makes RAG quality inspectable without turning normal tests into paid API calls. Regular tests still use mock providers. Real OpenAI smoke testing is an explicit opt-in command.
+Expected result: GitHub shows a Check Run named `ArchGuard Architecture Fitness`. A violating frontend database import should produce `DRIFT_RISK`; normal maintenance changes should produce `FIT`.
 
-Mock eval with a timestamped report:
+For an interview-ready script, see [docs/demo-runbook.md](docs/demo-runbook.md).
 
-```bash
-ANALYZER_PROVIDER=rag LLM_PROVIDER=mock RAG_WRITE_EVAL_REPORT=true pnpm eval:rag
-```
+## GitHub App Setup
 
-OpenAI smoke test:
-
-```bash
-ANALYZER_PROVIDER=rag LLM_PROVIDER=openai OPENAI_API_KEY=... pnpm smoke:openai-rag
-```
-
-Debug prompt traces:
-
-```bash
-ANALYZER_PROVIDER=rag LLM_PROVIDER=mock DEBUG_RAG_PROMPTS=true RAG_WRITE_EVAL_REPORT=true pnpm eval:rag
-```
-
-Golden validation:
-
-```bash
-ANALYZER_PROVIDER=rag LLM_PROVIDER=mock RAG_VALIDATE_GOLDEN=true pnpm eval:rag
-```
-
-Eval reports are written only when `RAG_WRITE_EVAL_REPORT=true`:
-
-```text
-.reports/rag-evals/rag-eval-YYYYMMDD-HHMMSS.json
-```
-
-Reports include run metadata, pass/fail counts, average latency, confidence buckets, fallback status, top evidence files, and approximate token estimates using `ceil(charCount / 4)`. Approximate cost is included only when `LLM_INPUT_COST_PER_1M_TOKENS` and `LLM_OUTPUT_COST_PER_1M_TOKENS` are provided; those values are configuration inputs, not hardcoded pricing claims.
-
-Prompt/output traces are written only when `DEBUG_RAG_PROMPTS=true`:
-
-```text
-.reports/rag-traces/<run-id>/<case-name>/
-  prompt.txt
-  raw-llm-output.json
-  parsed-result.json
-  retrieved-context.json
-```
-
-`.reports/` is ignored by Git. Trace files redact obvious OpenAI API key patterns, but they may still contain repository snippets; treat them as local debugging artifacts.
-
-Golden fixtures live in:
-
-```text
-fixtures/evals/golden/
-```
-
-Golden checks intentionally validate minimal stable expectations only: verdict, required evidence files, and required severity. They do not snapshot model prose.
-
-The OpenAI smoke test runs only two small cases by default: frontend importing DB and clean frontend display change. It refuses to run unless `ANALYZER_PROVIDER=rag`, `LLM_PROVIDER=openai`, and `OPENAI_API_KEY` are set. By default, `SMOKE_FAIL_ON_FALLBACK=true` makes the smoke test fail if the RAG analyzer falls back to mock.
-
-## Phase 5: Real GitHub PR End-to-End Test
-
-Phase 5 verifies the real GitHub path with mock RAG enabled:
-
-```text
-GitHub PR
-→ webhook
-→ BullMQ job
-→ worker
-→ repository indexing
-→ pgvector retrieval
-→ RAG analyzer in mock mode
-→ GitHub Check Run
-→ persisted AnalysisRun metadata
-```
-
-Use mock RAG for this phase:
-
-```env
-ANALYZER_PROVIDER=rag
-LLM_PROVIDER=mock
-EMBEDDING_PROVIDER=fake
-```
-
-### A. Create GitHub App
-
-- Homepage URL can be your localhost/ngrok URL for development.
-- Enable webhook delivery.
-- Webhook URL should be:
-
-```text
-PUBLIC_WEBHOOK_URL + /webhooks/github
-```
-
-Example:
-
-```text
-https://your-ngrok-url.ngrok-free.app/webhooks/github
-```
-
-- Set a webhook secret and copy it into `GITHUB_WEBHOOK_SECRET`.
-- Permissions:
-  - Contents: Read-only
-  - Pull requests: Read-only
-  - Checks: Read and write
-  - Metadata: Read-only
-- Subscribe to events:
-  - Pull request
-
-### B. Install App
-
-Install the GitHub App on the test repository. The app must be installed on the same repository referenced by:
-
-```env
-TEST_GITHUB_OWNER=...
-TEST_GITHUB_REPO=...
-```
-
-### C. Configure `.env`
-
-```env
-NODE_ENV=development
-PORT=3000
-DATABASE_URL=postgresql://archguard:archguard@localhost:5432/archguard
-REDIS_URL=redis://localhost:6379
-
-ANALYZER_PROVIDER=rag
-LLM_PROVIDER=mock
-EMBEDDING_PROVIDER=fake
-
-PUBLIC_WEBHOOK_URL=https://your-ngrok-url
-TEST_GITHUB_OWNER=...
-TEST_GITHUB_REPO=...
-TEST_GITHUB_PR_NUMBER=
-TEST_GITHUB_INSTALLATION_ID=
-
-GITHUB_APP_ID=...
-GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-GITHUB_WEBHOOK_SECRET=...
-GITHUB_CLIENT_ID=...
-GITHUB_CLIENT_SECRET=...
-```
-
-### D. Start Infrastructure
-
-```bash
-docker compose up -d --wait postgres redis
-pnpm prisma:generate
-pnpm prisma:migrate
-```
-
-### E. Start API
-
-```bash
-pnpm dev
-```
-
-### F. Start Worker
-
-In another terminal:
-
-```bash
-pnpm worker
-```
-
-### G. Start Ngrok
-
-```bash
-ngrok http 3000
-```
-
-Set `PUBLIC_WEBHOOK_URL` to the ngrok HTTPS base URL and update the GitHub App webhook URL to:
-
-```text
-https://your-ngrok-url/webhooks/github
-```
-
-### H. Run E2E Checker
-
-```bash
-pnpm e2e:check
-```
-
-Expected shape:
-
-```json
-{
-  "status": "ok",
-  "checks": {
-    "database": "ok",
-    "redis": "ok",
-    "apiHealth": "ok",
-    "apiReady": "ok",
-    "githubAppEnv": "ok",
-    "webhookUrl": "ok",
-    "analyzerMode": "ok",
-    "queue": "ok"
-  },
-  "nextSteps": []
-}
-```
-
-Optional PR inspection:
-
-```bash
-pnpm inspect:pr -- owner=OWNER repo=REPO pr=NUMBER
-```
-
-This uses GitHub App installation authentication and prints PR metadata, changed files, head SHA, additions/deletions, and whether the PR has enough information for ArchGuard analysis.
-
-### I. Create Test PR
-
-Recommended violating PR:
-
-Modify:
-
-```text
-src/frontend/components/UserCard.tsx
-```
-
-Add:
-
-```ts
-import { db } from "../../backend/db/client";
-```
-
-Expected:
-
-- GitHub webhook delivery returns `202`.
-- BullMQ job is created.
-- Worker processes the job.
-- `WebhookEvent`, `Repository`, `PullRequest`, and `AnalysisRun` rows are persisted.
-- GitHub Check Run appears as **ArchGuard Architecture Fitness**.
-- Verdict is `DRIFT_RISK`.
-- Evidence references ADR 0002 and the changed frontend file.
-
-### J. Debug Webhook Delivery
-
-Use GitHub App webhook delivery logs:
-
-1. Open GitHub App settings.
-2. Go to **Advanced**.
-3. Inspect **Recent Deliveries**.
-4. Confirm the delivery response is `202`.
-5. Open the request headers and confirm `x-github-event=pull_request`.
-6. Click **Redeliver** to test idempotency.
-
-Expected redelivery behavior:
-
-- Duplicate delivery is accepted.
-- ArchGuard returns `202`.
-- The existing `WebhookEvent.githubDeliveryId` remains unique.
-- No duplicate BullMQ analysis job is created for the same delivery ID.
-
-### Prisma Inspection
-
-Open Prisma Studio:
-
-```bash
-pnpm prisma studio
-```
-
-Inspect:
-
-- `WebhookEvent`: delivery ID, status, action, repository, PR number.
-- `Repository`: GitHub repository metadata.
-- `PullRequest`: PR number, state, head SHA.
-- `AnalysisRun`: status, verdict, analyzer provider, model name, fallback status, Check Run ID.
-- `Finding`: finding title, severity, evidence, recommendation.
-- `CodeChunk`: indexed code/ADR chunks and embedding status.
-- `ArchitectureDocument`: detected ADRs and architecture docs.
-
-## Recommended ADR Layout
-
-```text
-docs/adr/
-  0001-use-layered-architecture.md
-  0002-frontend-must-not-import-db.md
-```
-
-Example ADR:
-
-```markdown
-# ADR 0002: Frontend must not import database layer
-
-## Status
-Accepted
-
-## Context
-Frontend code should communicate through API/service boundaries.
-
-## Decision
-Files under frontend/ or ui/ must not import from db/ directly.
-
-## Consequences
-Database access remains centralized in backend services.
-```
-
-ADR scanner paths:
-
-- `docs/adr`
-- `docs/adrs`
-- `adr`
-- `adrs`
-- `architecture`
-- `docs/architecture`
-
-## Failure Behavior
-
-- Invalid webhook signatures return `401` and are not persisted.
-- Missing required GitHub headers return `400`.
-- Unsupported events are persisted as `IGNORED`.
-- Duplicate deliveries return `202 already_received`.
-- Jobs retry up to 3 times with exponential backoff.
-- Invalid job payloads fail fast.
-- On final job failure, `AnalysisRun.status` becomes `FAILED` and `errorMessage` is stored.
-- Check Run failure output is neutral in the MVP so ArchGuard remains advisory.
-
-## Failure Mode Guide
-
-### Port 3000 Already In Use
-
-If `pnpm dev` reports `EADDRINUSE`:
-
-```bash
-pnpm check:port -- 3000
-pnpm kill:port -- 3000 --yes
-pnpm dev
-```
-
-`check:port` prints the process listening on the port. `kill:port` only targets processes listening on that port and asks for confirmation unless `--yes` is passed.
-
-### Interactive GitHub App Setup Exits Non-Zero
-
-The interactive setup wizard should prompt, write `.env`, print a masked summary, and exit `0` after success. If it exits non-zero:
-
-```bash
-pnpm validate:github-app
-pnpm doctor
-```
-
-Then rerun:
+Use the interactive helper instead of pasting private key text by hand:
 
 ```bash
 pnpm setup:github-app:interactive
+pnpm validate:github-app
 ```
 
-### Secrets Exposed In Terminal
+The helper can discover downloaded `.pem` files, validate the private key, mask secret previews, back up `.env`, and update GitHub-related values safely.
 
-If a terminal log accidentally contains a GitHub Client Secret, webhook secret, private key, or token:
+## Environment Variables
 
-- Rotate the GitHub Client Secret.
-- Rotate the Webhook Secret.
-- Regenerate the GitHub App private key if the PEM was exposed.
-- Rerun `pnpm setup:github-app:interactive`.
-- Never share terminal logs containing secrets.
+Start from:
 
-If the webhook returns `401`:
+```bash
+cp .env.example .env
+```
 
-- Confirm `GITHUB_WEBHOOK_SECRET` matches the GitHub App webhook secret.
-- Confirm the request is going to `/webhooks/github`, not the dev replay endpoint.
-- In GitHub Recent Deliveries, inspect the request headers and response.
+Important groups:
 
-If the webhook returns `202` but no job appears:
+- Local services: `PORT`, `DATABASE_URL`, `REDIS_URL`
+- GitHub App: `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+- Local webhook debug: `DEV_WEBHOOK_TOKEN`
+- Retrieval: `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`, `EMBEDDING_BATCH_SIZE`, `RETRIEVAL_TOP_K`, `RETRIEVAL_MAX_CONTEXT_CHARS`
+- Analyzer: `ANALYZER_PROVIDER`, `LLM_PROVIDER`, `LLM_MODEL`, `RAG_PROMPT_VERSION`, `RAG_MAX_CONTEXT_CHARS`, `RAG_FALLBACK_TO_MOCK`
+- GitHub demo: `PUBLIC_WEBHOOK_URL`, `TEST_GITHUB_OWNER`, `TEST_GITHUB_REPO`, optional `TEST_GITHUB_PR_NUMBER`, optional `TEST_GITHUB_INSTALLATION_ID`
 
-- Check `WebhookEvent.status` in Prisma Studio.
-- Confirm the event is `pull_request` and action is `opened`, `synchronize`, or `reopened`.
-- Confirm Redis is reachable with `redis-cli ping`.
-- Check API logs for `enqueue_failed`.
-
-If the worker does not pick up a job:
-
-- Confirm `pnpm worker` is running.
-- Confirm `REDIS_URL` is identical for API and worker.
-- Check `redis-cli llen bull:archguard-analysis:wait`.
-- Check worker startup logs for queue name and Redis status.
-
-If the Check Run does not appear:
-
-- Confirm the GitHub App has Checks read/write permission.
-- Confirm the app is installed on the repository receiving the PR.
-- Check `AnalysisRun.githubCheckRunId`.
-- Check worker logs for GitHub API errors.
-
-If GitHub auth fails:
-
-- Confirm `GITHUB_APP_ID` is numeric and belongs to the app.
-- Confirm `GITHUB_PRIVATE_KEY` is the app private key, with newlines escaped as `\n` if stored on one line.
-- Run `/ready`; `githubApp` should be `ok`.
-- Regenerate the GitHub App private key if parsing fails.
-
-If Redis connection fails:
-
-- Run `docker compose up -d redis`.
-- Run `redis-cli ping`.
-- Confirm `REDIS_URL=redis://localhost:6379`.
-
-If Prisma migration fails:
-
-- Run `docker compose up -d postgres`.
-- Confirm the Postgres image is `pgvector/pgvector:pg16`.
-- Confirm `DATABASE_URL` points to the local Postgres service.
-- Run `pnpm prisma:generate`.
-- Re-run `pnpm prisma:migrate` and inspect the reported migration name.
-
-## Mock Analyzer Behavior
-
-The MVP analyzer returns:
-
-- `DRIFT_RISK` when a diff adds a direct import from `db` inside files under `ui/` or `frontend/`.
-- `INSUFFICIENT_EVIDENCE` when there are no meaningful source changes.
-- `FIT` for ordinary source changes that do not trip the MVP heuristic.
-
-The Check Run output includes verdict, confidence, summary, findings table, retrieved context summary, and a note that ArchGuard is advisory in the MVP.
+Never commit `.env`, `.env.*`, downloaded GitHub App PEM files, ngrok tokens, OpenAI keys, webhook secrets, or client secrets.
 
 ## Current Limitations
 
-- Embeddings are deterministic fake vectors unless `EMBEDDING_PROVIDER=openai`.
-- OpenAI embeddings are implemented but not required for local tests.
-- The default analyzer is heuristic-only; the RAG analyzer is opt-in with `ANALYZER_PROVIDER=rag`.
-- The mock LLM provider is deterministic and intended for local evals.
-- Repository indexing is synchronous inside the worker.
-- RAG prompts are architecture-focused, but real OpenAI judgment is only used when explicitly configured.
-- Tenant isolation is modeled but not hardened.
-- No dashboard, billing, auth UI, or production observability stack yet.
+- Mock LLM mode is the default and is the supported normal demo path.
+- Fake deterministic embeddings are the default for local development.
+- OpenAI LLM and embedding providers exist, but are opt-in and not required for CI or demos.
+- The real GitHub demo currently uses local infrastructure plus ngrok.
+- There is no SaaS dashboard yet.
+- Tenant fields exist in the schema, but enterprise-grade tenant isolation is not implemented.
 
-## Future Roadmap
+## Roadmap
 
-- Phase 5 production hardening for RAG quality, prompt evals, and provider observability.
-- Multi-repo support.
-- SaaS dashboard.
-- Hardened tenant isolation.
-- Observability for webhook intake, indexing, retrieval, and analysis jobs.
+Phase 7 candidates:
+
+- Hosted deployment.
+- Explicit real OpenAI smoke mode documentation and safeguards.
+- Small web dashboard for runs and findings.
+- Repository onboarding UI.
+- Improved retrieval evals and golden evidence expectations.
+- Better observability for worker latency and GitHub API failures.
+
+## Security
+
+See [docs/security.md](docs/security.md).
+
+The short version:
+
+- Keep GitHub App permissions minimal.
+- Never commit secrets or PEM files.
+- Do not log prompts, private keys, webhook secrets, client secrets, or raw full diffs.
+- Rotate any secret that appears in terminal logs, screenshots, issue comments, or commits.
