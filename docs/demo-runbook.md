@@ -26,6 +26,8 @@ Also confirm:
 
 ## Demo Story
 
+Keep PR #1 open while recording demos so the architecture-drift proof remains easy to inspect.
+
 ### 1. Show The Architecture Diagram
 
 Start with the README architecture diagram. Explain the durable path:
