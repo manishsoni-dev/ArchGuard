@@ -1,6 +1,14 @@
 import { fileURLToPath } from "node:url";
 import { prisma } from "../db/prisma.js";
 
+function stringifyDiagnostics(value: unknown): string {
+  return JSON.stringify(
+    value,
+    (_key, nestedValue) => (typeof nestedValue === "bigint" ? nestedValue.toString() : nestedValue),
+    2
+  );
+}
+
 export async function listRecentAnalysisRuns(limit = 10) {
   return prisma.analysisRun.findMany({
     orderBy: { createdAt: "desc" },
@@ -43,7 +51,7 @@ export async function listRecentAnalysisRuns(limit = 10) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   void listRecentAnalysisRuns()
     .then((analysisRuns) => {
-      console.log(JSON.stringify({ analysisRuns }, null, 2));
+      console.log(stringifyDiagnostics({ analysisRuns }));
     })
     .catch((error) => {
       console.error(error instanceof Error ? error.message : error);
