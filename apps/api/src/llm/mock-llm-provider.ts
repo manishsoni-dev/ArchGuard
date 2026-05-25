@@ -19,6 +19,8 @@ export class MockLLMProvider implements LLMProvider {
 }
 
 function mockResultForPrompt(prompt: string): unknown {
+  const diff = extractPullRequestDiff(prompt);
+
   if (
     prompt.includes("no meaningful diff") ||
     prompt.includes("empty/no meaningful diff") ||
@@ -34,8 +36,8 @@ function mockResultForPrompt(prompt: string): unknown {
   }
 
   if (
-    (prompt.includes("frontend") || prompt.includes("ui")) &&
-    (prompt.includes("+import { db }") || prompt.includes("from \"../../backend/db/client\""))
+    (diff.includes("frontend") || diff.includes("ui")) &&
+    (diff.includes("+import { db }") || diff.includes("from \"../../backend/db/client\""))
   ) {
     return {
       verdict: "DRIFT_RISK",
@@ -55,9 +57,9 @@ function mockResultForPrompt(prompt: string): unknown {
   }
 
   if (
-    prompt.includes("src/frontend/") &&
-    prompt.includes("+import") &&
-    prompt.includes("../../backend/services")
+    diff.includes("src/frontend/") &&
+    diff.includes("+import") &&
+    diff.includes("../../backend/services")
   ) {
     return {
       verdict: "DRIFT_RISK",
@@ -76,7 +78,7 @@ function mockResultForPrompt(prompt: string): unknown {
     };
   }
 
-  if (prompt.includes("src/backend/services") && prompt.includes("+import") && prompt.includes("../../frontend")) {
+  if (diff.includes("src/backend/services") && diff.includes("+import") && diff.includes("../../frontend")) {
     return {
       verdict: "DRIFT_RISK",
       confidence: 0.84,
@@ -101,4 +103,14 @@ function mockResultForPrompt(prompt: string): unknown {
     findings: [],
     retrievedContextSummary: "RAG mock used retrieved ADR/code context."
   };
+}
+
+function extractPullRequestDiff(prompt: string): string {
+  const marker = "pull request diff:";
+  const markerIndex = prompt.lastIndexOf(marker);
+  if (markerIndex === -1) {
+    return prompt;
+  }
+
+  return prompt.slice(markerIndex + marker.length);
 }
