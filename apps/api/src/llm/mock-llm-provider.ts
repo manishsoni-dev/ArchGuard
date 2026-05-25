@@ -35,10 +35,7 @@ function mockResultForPrompt(prompt: string): unknown {
     };
   }
 
-  if (
-    (diff.includes("frontend") || diff.includes("ui")) &&
-    (diff.includes("+import { db }") || diff.includes("from \"../../backend/db/client\""))
-  ) {
+  if (hasAddedImportInPath(diff, isFrontendPath, isDatabaseImportLine)) {
     return {
       verdict: "DRIFT_RISK",
       confidence: 0.88,
@@ -56,11 +53,7 @@ function mockResultForPrompt(prompt: string): unknown {
     };
   }
 
-  if (
-    diff.includes("src/frontend/") &&
-    diff.includes("+import") &&
-    diff.includes("../../backend/services")
-  ) {
+  if (hasAddedImportInPath(diff, isFrontendPath, (line) => line.includes("backend/services"))) {
     return {
       verdict: "DRIFT_RISK",
       confidence: 0.83,
@@ -78,7 +71,7 @@ function mockResultForPrompt(prompt: string): unknown {
     };
   }
 
-  if (diff.includes("src/backend/services") && diff.includes("+import") && diff.includes("../../frontend")) {
+  if (hasAddedImportInPath(diff, isBackendServicePath, (line) => line.includes("../../frontend"))) {
     return {
       verdict: "DRIFT_RISK",
       confidence: 0.84,
@@ -113,4 +106,42 @@ function extractPullRequestDiff(prompt: string): string {
   }
 
   return prompt.slice(markerIndex + marker.length);
+}
+
+function hasAddedImportInPath(
+  diff: string,
+  pathPredicate: (filePath: string) => boolean,
+  linePredicate: (line: string) => boolean
+): boolean {
+  let currentFilePath = "";
+
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+++ b/")) {
+      currentFilePath = line.slice("+++ b/".length).trim().toLowerCase();
+      continue;
+    }
+
+    if (!line.startsWith("+") || line.startsWith("+++")) {
+      continue;
+    }
+
+    const addedLine = line.slice(1).trim().toLowerCase();
+    if (pathPredicate(currentFilePath) && addedLine.startsWith("import ") && linePredicate(addedLine)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isFrontendPath(filePath: string): boolean {
+  return filePath.includes("/frontend/") || filePath.startsWith("frontend/") || filePath.includes("/ui/") || filePath.startsWith("ui/");
+}
+
+function isBackendServicePath(filePath: string): boolean {
+  return filePath.includes("/backend/services/") || filePath.startsWith("backend/services/");
+}
+
+function isDatabaseImportLine(line: string): boolean {
+  return line.includes("backend/db") || line.includes("/db/") || line.includes("from \"db") || line.includes("from 'db");
 }
