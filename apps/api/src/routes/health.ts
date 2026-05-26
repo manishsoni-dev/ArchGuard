@@ -20,6 +20,8 @@ export type RegisterHealthRoutesOptions = {
     | "GITHUB_WEBHOOK_SECRET"
     | "GITHUB_CLIENT_ID"
     | "GITHUB_CLIENT_SECRET"
+    | "APP_VERSION"
+    | "GIT_SHA"
     | "NODE_ENV"
   >;
   readiness: ReadinessDependencies;
@@ -32,6 +34,13 @@ export async function registerHealthRoutes(
   fastify.get("/health", async () => ({
     status: "ok",
     service: "archguard-api"
+  }));
+
+  fastify.get("/version", async () => ({
+    service: "archguard-api",
+    version: options.env.APP_VERSION,
+    commit: options.env.GIT_SHA,
+    environment: options.env.NODE_ENV
   }));
 
   fastify.get("/ready", async (_request, reply) => {

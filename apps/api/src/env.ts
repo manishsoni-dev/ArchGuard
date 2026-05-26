@@ -46,6 +46,8 @@ const envSchema = z.object({
   TEST_GITHUB_REPO: z.string().optional(),
   TEST_GITHUB_PR_NUMBER: z.coerce.number().int().positive().optional(),
   TEST_GITHUB_INSTALLATION_ID: z.coerce.number().int().positive().optional(),
+  APP_VERSION: z.string().default("0.1.0"),
+  GIT_SHA: z.string().default("unknown"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 

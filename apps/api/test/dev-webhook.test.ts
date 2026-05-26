@@ -151,6 +151,8 @@ function testEnv(overrides: Partial<ServerEnv> = {}): ServerEnv {
     GITHUB_CLIENT_ID: "client-id",
     GITHUB_CLIENT_SECRET: "client-secret",
     DEV_WEBHOOK_TOKEN: "dev-token",
+    APP_VERSION: "0.1.0",
+    GIT_SHA: "test-sha",
     NODE_ENV: "test",
     ...overrides
   };

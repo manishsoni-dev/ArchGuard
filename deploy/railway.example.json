@@ -1,0 +1,43 @@
+{
+  "note": "Example template only. Adapt service names, variables, and Railway project configuration before use.",
+  "services": {
+    "archguard-api": {
+      "dockerfile": "Dockerfile.api",
+      "startCommand": "node apps/api/dist/src/server.js",
+      "healthcheckPath": "/health",
+      "variables": {
+        "NODE_ENV": "production",
+        "PORT": "3000",
+        "ANALYZER_PROVIDER": "rag",
+        "LLM_PROVIDER": "mock",
+        "EMBEDDING_PROVIDER": "fake",
+        "DATABASE_URL": "${{Postgres.DATABASE_URL}}",
+        "REDIS_URL": "${{Redis.REDIS_URL}}",
+        "GITHUB_APP_ID": "${{secrets.GITHUB_APP_ID}}",
+        "GITHUB_PRIVATE_KEY": "${{secrets.GITHUB_PRIVATE_KEY}}",
+        "GITHUB_WEBHOOK_SECRET": "${{secrets.GITHUB_WEBHOOK_SECRET}}",
+        "GITHUB_CLIENT_ID": "${{secrets.GITHUB_CLIENT_ID}}",
+        "GITHUB_CLIENT_SECRET": "${{secrets.GITHUB_CLIENT_SECRET}}",
+        "PUBLIC_WEBHOOK_URL": "https://YOUR-STABLE-DOMAIN"
+      }
+    },
+    "archguard-worker": {
+      "dockerfile": "Dockerfile.worker",
+      "startCommand": "node apps/api/dist/src/jobs/worker.js",
+      "variables": {
+        "NODE_ENV": "production",
+        "ANALYZER_PROVIDER": "rag",
+        "LLM_PROVIDER": "mock",
+        "EMBEDDING_PROVIDER": "fake",
+        "DATABASE_URL": "${{Postgres.DATABASE_URL}}",
+        "REDIS_URL": "${{Redis.REDIS_URL}}",
+        "GITHUB_APP_ID": "${{secrets.GITHUB_APP_ID}}",
+        "GITHUB_PRIVATE_KEY": "${{secrets.GITHUB_PRIVATE_KEY}}",
+        "GITHUB_WEBHOOK_SECRET": "${{secrets.GITHUB_WEBHOOK_SECRET}}",
+        "GITHUB_CLIENT_ID": "${{secrets.GITHUB_CLIENT_ID}}",
+        "GITHUB_CLIENT_SECRET": "${{secrets.GITHUB_CLIENT_SECRET}}",
+        "PUBLIC_WEBHOOK_URL": "https://YOUR-STABLE-DOMAIN"
+      }
+    }
+  }
+}
