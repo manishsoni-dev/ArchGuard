@@ -28,9 +28,10 @@ describe("deployment operations helpers", () => {
   });
 
   it("secrets checker flags obvious real-looking secrets", () => {
+    const leakedSecret = "OPENAI_API_KEY=" + "sk-realLookingSecret1234567890";
     const report = runSecretsCheck({
       files: {
-        "src/leak.ts": 'const value = "OPENAI_API_KEY=sk-realLookingSecret1234567890";'
+        "src/leak.ts": leakedSecret
       }
     });
 
