@@ -33,6 +33,33 @@ describe("health routes", () => {
     });
   });
 
+  it("/version returns safe build metadata", async () => {
+    server = await buildServer({
+      env: {
+        ...testEnv(),
+        APP_VERSION: "1.2.3",
+        GIT_SHA: "abc123"
+      },
+      eventStore: noopEventStore(),
+      enqueuer: noopEnqueuer(),
+      readiness: okReadiness()
+    });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/version"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      service: "archguard-api",
+      version: "1.2.3",
+      commit: "abc123",
+      environment: "test"
+    });
+    expect(JSON.stringify(response.json())).not.toContain("webhook-secret");
+  });
+
   it("/ready reports database and redis checks using mocked dependencies", async () => {
     server = await buildServer({
       env: testEnv(),
@@ -141,6 +168,8 @@ function testEnv(): ServerEnv {
     GITHUB_CLIENT_ID: "client-id",
     GITHUB_CLIENT_SECRET: "client-secret",
     DEV_WEBHOOK_TOKEN: "dev-token",
+    APP_VERSION: "0.1.0",
+    GIT_SHA: "test-sha",
     NODE_ENV: "test"
   };
 }

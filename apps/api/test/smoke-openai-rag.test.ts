@@ -58,6 +58,8 @@ function env(overrides: Partial<Env> = {}): Env {
     RAG_WRITE_EVAL_REPORT: false,
     RAG_VALIDATE_GOLDEN: false,
     SMOKE_FAIL_ON_FALLBACK: true,
+    APP_VERSION: "0.1.0",
+    GIT_SHA: "test-sha",
     NODE_ENV: "test",
     ...overrides
   };
@@ -101,4 +103,3 @@ function report(input: { fallbackUsed: boolean; passed: boolean }) {
     passed: input.passed
   };
 }
-

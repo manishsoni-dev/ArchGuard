@@ -94,6 +94,8 @@ function env(overrides: Partial<Env> = {}): Env {
     PUBLIC_WEBHOOK_URL: "https://example.ngrok-free.app",
     TEST_GITHUB_OWNER: "acme",
     TEST_GITHUB_REPO: "widgets",
+    APP_VERSION: "0.1.0",
+    GIT_SHA: "test-sha",
     NODE_ENV: "test",
     ...overrides
   };

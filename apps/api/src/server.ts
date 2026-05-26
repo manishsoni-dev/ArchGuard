@@ -19,6 +19,8 @@ export type ServerEnv = Pick<
   | "GITHUB_CLIENT_ID"
   | "GITHUB_CLIENT_SECRET"
   | "DEV_WEBHOOK_TOKEN"
+  | "APP_VERSION"
+  | "GIT_SHA"
   | "NODE_ENV"
 >;
 

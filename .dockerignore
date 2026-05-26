@@ -1,0 +1,11 @@
+.env
+.env.*
+*.pem
+node_modules
+.git
+.tmp
+.reports
+apps/api/.archguard
+coverage
+dist
+.DS_Store

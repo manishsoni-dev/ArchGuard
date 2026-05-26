@@ -1,5 +1,7 @@
 # ArchGuard
 
+[![CI](https://github.com/Manisshhhhhh/ArchGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/Manisshhhhhh/ArchGuard/actions/workflows/ci.yml)
+
 ArchGuard is an AI-powered GitHub PR bot that checks whether new code fits a repository's architecture.
 
 ## Problem
@@ -71,6 +73,31 @@ flowchart LR
 ```
 
 See [docs/architecture.md](docs/architecture.md) for the deeper technical walkthrough.
+
+## Hosted Deployment
+
+ArchGuard can be deployed as two Node.js processes: an API server and a BullMQ worker, backed by Postgres with pgvector and Redis. The default hosted demo mode remains `ANALYZER_PROVIDER=rag`, `LLM_PROVIDER=mock`, and `EMBEDDING_PROVIDER=fake`, so no OpenAI key is required.
+
+Deployment assets:
+
+- [docs/deployment.md](docs/deployment.md)
+- [docs/operations.md](docs/operations.md)
+- [deploy/README.md](deploy/README.md)
+- [deploy/processes.md](deploy/processes.md)
+- [deploy/docker-compose.production.example.yml](deploy/docker-compose.production.example.yml)
+- [.env.production.example](.env.production.example)
+
+Useful deployment checks:
+
+```bash
+pnpm deployment:checklist
+pnpm github-app:cutover-plan -- url=https://YOUR-STABLE-DOMAIN.com
+pnpm validate:prod-env
+pnpm smoke:deployment -- baseUrl=https://YOUR-DEPLOYED-DOMAIN
+pnpm hosted:pr-proof -- owner=OWNER repo=REPO pr=NUMBER baseUrl=https://YOUR-DEPLOYED-DOMAIN
+pnpm docker:build:api
+pnpm docker:build:worker
+```
 
 ## Tech Stack
 
