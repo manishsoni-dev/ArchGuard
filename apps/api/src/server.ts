@@ -36,6 +36,11 @@ export async function buildServer(options: BuildServerOptions) {
     logger: true
   });
 
+  await registerHealthRoutes(fastify, {
+    env: options.env,
+    readiness: options.readiness
+  });
+
   fastify.addContentTypeParser("application/json", { parseAs: "string" }, (request, body, done) => {
     const rawBody = typeof body === "string" ? body : body.toString("utf8");
     const requestWithRawBody = request as typeof request & { rawBody?: string };
@@ -55,11 +60,6 @@ export async function buildServer(options: BuildServerOptions) {
     eventStore: options.eventStore,
     enqueuer: options.enqueuer,
     logger
-  });
-
-  await registerHealthRoutes(fastify, {
-    env: options.env,
-    readiness: options.readiness
   });
 
   return fastify;
@@ -86,11 +86,29 @@ export async function startServer(): Promise<void> {
     }
   });
 
+  const listenConfig = resolveListenConfig(env);
+  logger.info(
+    {
+      host: listenConfig.host,
+      port: listenConfig.port,
+      nodeEnv: env.NODE_ENV,
+      service: "archguard-api"
+    },
+    "Starting ArchGuard API server"
+  );
+
   try {
-    await server.listen({ port: env.PORT, host: "0.0.0.0" });
+    await server.listen(listenConfig);
   } catch (error) {
-    throw friendlyListenError(error, env.PORT);
+    throw friendlyListenError(error, listenConfig.port);
   }
+}
+
+export function resolveListenConfig(env: Pick<Env, "PORT" | "HOST" | "NODE_ENV">): { port: number; host: string } {
+  return {
+    port: env.PORT,
+    host: env.HOST || "0.0.0.0"
+  };
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

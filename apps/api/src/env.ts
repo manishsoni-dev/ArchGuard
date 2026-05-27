@@ -12,6 +12,7 @@ for (const candidate of [path.resolve(process.cwd(), ".env"), path.resolve(proce
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
+  HOST: z.string().min(1).default("0.0.0.0"),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
   GITHUB_APP_ID: z.coerce.number().int().positive(),

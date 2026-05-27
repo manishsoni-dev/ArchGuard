@@ -82,6 +82,7 @@ Deployment assets:
 
 - [docs/deployment.md](docs/deployment.md)
 - [docs/operations.md](docs/operations.md)
+- [docs/railway-deployment.md](docs/railway-deployment.md)
 - [deploy/README.md](deploy/README.md)
 - [deploy/processes.md](deploy/processes.md)
 - [deploy/docker-compose.production.example.yml](deploy/docker-compose.production.example.yml)
@@ -89,8 +90,13 @@ Deployment assets:
 
 Useful deployment checks:
 
+Do not run commands with literal placeholders such as `THE_REAL_API_SERVICE_URL`, `YOUR-STABLE-DOMAIN`, or `YOUR-DEPLOYED-DOMAIN`. Copy the exact public domain from the Railway API service.
+
 ```bash
 pnpm deployment:checklist
+pnpm production:command-check
+pnpm railway:diagnose
+pnpm railway:domain-check -- baseUrl=https://YOUR-DEPLOYED-DOMAIN
 pnpm github-app:cutover-plan -- url=https://YOUR-STABLE-DOMAIN.com
 pnpm validate:prod-env
 pnpm smoke:deployment -- baseUrl=https://YOUR-DEPLOYED-DOMAIN
@@ -98,6 +104,8 @@ pnpm hosted:pr-proof -- owner=OWNER repo=REPO pr=NUMBER baseUrl=https://YOUR-DEP
 pnpm docker:build:api
 pnpm docker:build:worker
 ```
+
+Railway `404 Application not found` on `/health`, `/ready`, and `/version` means the domain is not attached to the API service, or the wrong/stale domain is being used. Fix it in Railway under API service → Networking → Generate/Attach Domain.
 
 ## Tech Stack
 

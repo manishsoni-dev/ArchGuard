@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildDeploymentChecklist } from "../src/scripts/deployment-checklist.js";
-import { buildGitHubAppCutoverPlan } from "../src/scripts/github-app-cutover-plan.js";
+import { CliArgumentError } from "../src/scripts/cli-args.js";
+import { buildGitHubAppCutoverPlan, parseCutoverPlanArgs } from "../src/scripts/github-app-cutover-plan.js";
+import { buildRailwayCutoverChecklist } from "../src/scripts/railway-cutover-checklist.js";
 
 describe("deployment checklist and cutover plan", () => {
   it("reports required deployment files present", () => {
@@ -36,5 +38,30 @@ describe("deployment checklist and cutover plan", () => {
     expect(report.status).toBe("ok");
     expect(report.publicWebhookUrl).toBe("https://archguard.example.app");
     expect(report.githubAppWebhookUrl).toBe("https://archguard.example.app/webhooks/github");
+  });
+
+  it("returns friendly error for placeholder cutover URL", () => {
+    try {
+      parseCutoverPlanArgs(["url=https://YOUR-STABLE-DOMAIN.com"]);
+      throw new Error("expected parse to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CliArgumentError);
+      const report = (error as CliArgumentError).report;
+      expect(report.problems).toEqual([
+        {
+          field: "url",
+          message: "url must be a real https:// URL, not placeholder text."
+        }
+      ]);
+      expect(JSON.stringify(report)).not.toContain("ZodError");
+    }
+  });
+
+  it("returns Railway cutover manual checklist", () => {
+    const checklist = buildRailwayCutoverChecklist();
+
+    expect(checklist.status).toBe("manual_action_required");
+    expect(checklist.steps.map((step) => step.id)).toContain("select-api-service");
+    expect(JSON.stringify(checklist)).toContain("public domain");
   });
 });

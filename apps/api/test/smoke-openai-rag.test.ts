@@ -31,6 +31,7 @@ describe("OpenAI RAG smoke script", () => {
 function env(overrides: Partial<Env> = {}): Env {
   return {
     PORT: 3000,
+    HOST: "0.0.0.0",
     DATABASE_URL: "postgresql://archguard:archguard@localhost:5432/archguard?schema=public",
     REDIS_URL: "redis://localhost:6379",
     GITHUB_APP_ID: 1,

@@ -1,6 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { Env } from "../src/env.js";
+import { CliArgumentError } from "../src/scripts/cli-args.js";
 import { parseHostedPrProofArgs, runHostedPrProof } from "../src/scripts/hosted-pr-proof.js";
 
 describe("hosted PR proof", () => {
@@ -18,6 +19,28 @@ describe("hosted PR proof", () => {
       pr: 4,
       baseUrl: "https://archguard.example.app"
     });
+  });
+
+  it("returns friendly error for placeholder PR number", () => {
+    try {
+      parseHostedPrProofArgs([
+        "owner=Manisshhhhhh",
+        "repo=ArchGuard",
+        "pr=PR_NUMBER",
+        "baseUrl=https://archguard-production.up.railway.app"
+      ]);
+      throw new Error("expected parse to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CliArgumentError);
+      const report = (error as CliArgumentError).report;
+      expect(report.problems).toEqual([
+        {
+          field: "pr",
+          message: "pr must be a numeric pull request number, e.g. pr=6."
+        }
+      ]);
+      expect(JSON.stringify(report)).not.toContain("ZodError");
+    }
   });
 
   it("reports missing Check Run as warning", async () => {
@@ -38,6 +61,11 @@ describe("hosted PR proof", () => {
             https: "ok",
             webhookUrl: "ok",
             version: "ok"
+          },
+          details: {
+            health: httpDetails("https://archguard.example.app/health"),
+            ready: httpDetails("https://archguard.example.app/ready"),
+            version: httpDetails("https://archguard.example.app/version")
           },
           nextSteps: []
         }),
@@ -81,6 +109,7 @@ describe("hosted PR proof", () => {
 function env(): Env {
   return {
     PORT: 3000,
+    HOST: "0.0.0.0",
     DATABASE_URL: "postgresql://archguard:archguard@postgres:5432/archguard?schema=public",
     REDIS_URL: "redis://redis:6379",
     GITHUB_APP_ID: 123,
@@ -115,6 +144,17 @@ function env(): Env {
     APP_VERSION: "0.1.0",
     GIT_SHA: "test-sha",
     NODE_ENV: "test"
+  };
+}
+
+function httpDetails(url: string) {
+  return {
+    url,
+    statusCode: 200,
+    bodyPreview: "{}",
+    errorMessage: null,
+    looksLikeRailwayError: false,
+    looksLikeHtml: false
   };
 }
 

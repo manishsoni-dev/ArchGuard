@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { buildServer, type ServerEnv } from "../src/server.js";
+import { buildServer, resolveListenConfig, type ServerEnv } from "../src/server.js";
 import type { WebhookEventStore } from "../src/db/webhook-events.js";
 import type { AnalysisEnqueuer } from "../src/jobs/enqueue-analysis.js";
 
@@ -13,12 +13,50 @@ afterEach(async () => {
 });
 
 describe("health routes", () => {
+  it("uses process-style PORT and 0.0.0.0 listen defaults", () => {
+    expect(resolveListenConfig({ PORT: 4789, HOST: "0.0.0.0", NODE_ENV: "production" })).toEqual({
+      port: 4789,
+      host: "0.0.0.0"
+    });
+  });
+
   it("/health returns ok shape", async () => {
     server = await buildServer({
       env: testEnv(),
       eventStore: noopEventStore(),
       enqueuer: noopEnqueuer(),
       readiness: okReadiness()
+    });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/health"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      status: "ok",
+      service: "archguard-api"
+    });
+  });
+
+  it("/health does not depend on database redis or GitHub readiness", async () => {
+    server = await buildServer({
+      env: {
+        ...testEnv(),
+        GITHUB_PRIVATE_KEY:
+          "-----BEGIN RSA PRIVATE KEY-----\nPASTE_REAL_KEY_LINES_HERE\n-----END RSA PRIVATE KEY-----"
+      },
+      eventStore: noopEventStore(),
+      enqueuer: noopEnqueuer(),
+      readiness: {
+        checkDatabase: async () => {
+          throw new Error("database unavailable");
+        },
+        checkRedis: async () => {
+          throw new Error("redis unavailable");
+        }
+      }
     });
 
     const response = await server.inject({

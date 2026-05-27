@@ -6,6 +6,7 @@ import { loadEnv, type Env } from "../env.js";
 import { checkGitHubAppConfig } from "../github/github-app-check.js";
 import { createInstallationOctokit } from "../github/app-auth.js";
 import { fetchPullRequestChangedFiles, fetchPullRequestMetadata } from "../github/pull-request.js";
+import { assertNoPlaceholderArgs, parseOrFriendlyError, printCliArgumentError } from "./cli-args.js";
 import { smokeDeployment, type DeploymentSmokeReport } from "./smoke-deployment.js";
 
 type CheckStatus = "ok" | "warning" | "error";
@@ -55,6 +56,10 @@ const argsSchema = z.object({
   baseUrl: z.string().url()
 });
 
+const hostedProofExamples = [
+  "pnpm hosted:pr-proof -- owner=Manisshhhhhh repo=ArchGuard pr=6 baseUrl=https://archguard-production.up.railway.app"
+];
+
 export function parseHostedPrProofArgs(argv: string[]): HostedPrProofInput {
   const values: Record<string, string> = {};
   for (const arg of argv) {
@@ -63,7 +68,8 @@ export function parseHostedPrProofArgs(argv: string[]): HostedPrProofInput {
       if (arg.startsWith(`--${key}=`)) values[key] = arg.slice(key.length + 3);
     }
   }
-  return argsSchema.parse(values);
+  assertNoPlaceholderArgs(values, hostedProofExamples);
+  return parseOrFriendlyError(argsSchema, values, hostedProofExamples);
 }
 
 export async function runHostedPrProof(
@@ -208,7 +214,18 @@ function nextStepsFor(checks: HostedPrProofReport["checks"], input: HostedPrProo
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  void runHostedPrProof(parseHostedPrProofArgs(process.argv.slice(2)))
+  let input: HostedPrProofInput;
+  try {
+    input = parseHostedPrProofArgs(process.argv.slice(2));
+  } catch (error) {
+    if (!printCliArgumentError(error)) {
+      console.error(error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+    process.exit();
+  }
+
+  void runHostedPrProof(input)
     .then((report) => {
       console.log(JSON.stringify(report, null, 2));
       if (report.status === "error") process.exitCode = 1;

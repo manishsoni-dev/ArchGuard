@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { assertNoPlaceholderArgs, parseOrFriendlyError, printCliArgumentError } from "./cli-args.js";
 
 export type GitHubAppCutoverPlan = {
   status: "ok" | "error";
@@ -14,6 +15,10 @@ const argsSchema = z.object({
   allowNgrok: z.boolean().default(false)
 });
 
+const cutoverExamples = [
+  "pnpm github-app:cutover-plan -- url=https://archguard-production.up.railway.app"
+];
+
 export function parseCutoverPlanArgs(argv: string[]): { url: string; allowNgrok: boolean } {
   const values: Record<string, string | boolean> = {};
   for (const arg of argv) {
@@ -21,7 +26,12 @@ export function parseCutoverPlanArgs(argv: string[]): { url: string; allowNgrok:
     if (arg.startsWith("--url=")) values.url = arg.slice("--url=".length);
     if (arg === "--allow-ngrok" || arg === "allowNgrok=true" || arg === "--allow-ngrok=true") values.allowNgrok = true;
   }
-  return argsSchema.parse(values);
+  assertNoPlaceholderArgs(values, cutoverExamples);
+  const parsed = parseOrFriendlyError(argsSchema, values, cutoverExamples);
+  return {
+    url: parsed.url,
+    allowNgrok: parsed.allowNgrok ?? false
+  };
 }
 
 export function buildGitHubAppCutoverPlan(input: { url: string; allowNgrok?: boolean }): GitHubAppCutoverPlan {
@@ -72,7 +82,18 @@ function looksPlaceholder(value: string): boolean {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const report = buildGitHubAppCutoverPlan(parseCutoverPlanArgs(process.argv.slice(2)));
+  let input: { url: string; allowNgrok: boolean };
+  try {
+    input = parseCutoverPlanArgs(process.argv.slice(2));
+  } catch (error) {
+    if (!printCliArgumentError(error)) {
+      console.error(error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+    process.exit();
+  }
+
+  const report = buildGitHubAppCutoverPlan(input);
   console.log(JSON.stringify(report, null, 2));
   if (report.status !== "ok") process.exitCode = 1;
 }
