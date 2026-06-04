@@ -71,7 +71,7 @@ function App() {
   const [proof, setProof] = useState<DemoProof>(fallbackProof);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const repoUrl = useMemo(() => proof.repositoryUrl ?? "https://github.com/Manisshhhhhh/ArchGuard", [proof.repositoryUrl]);
+  const repoUrl = useMemo(() => proof.repositoryUrl ?? "https://github.com/manishsoni-dev/ArchGuard", [proof.repositoryUrl]);
 
   async function refresh() {
     if (!apiUrl) return;

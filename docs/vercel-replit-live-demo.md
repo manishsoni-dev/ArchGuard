@@ -45,9 +45,9 @@ Required Replit secrets:
 Recommended demo env:
 
 - `PUBLIC_WEBHOOK_URL=https://YOUR-REPLIT-PUBLIC-URL`
-- `DEMO_REPO_URL=https://github.com/OWNER/REPO`
-- `DEMO_DRIFT_PR_URL=https://github.com/OWNER/REPO/pull/1`
-- `DEMO_FIT_PR_URL=https://github.com/OWNER/REPO/pull/2`
+- `DEMO_REPO_URL=https://github.com/manishsoni-dev/ArchGuard`
+- `DEMO_DRIFT_PR_URL=https://github.com/manishsoni-dev/ArchGuard/pull/1`
+- `DEMO_FIT_PR_URL=https://github.com/manishsoni-dev/ArchGuard/pull/2`
 - `DEMO_ALLOWED_ORIGIN=https://YOUR-VERCEL-DEMO-URL`
 
 After the Replit process starts, set the GitHub App webhook URL to:
@@ -81,3 +81,14 @@ The Replit API should expose:
 - `/demo/proof`
 
 The public demo routes are safe to link publicly. They do not expose secrets, raw prompts, database URLs, Redis URLs, or retrieved context.
+
+## Demo Verification
+
+After Replit and Vercel are deployed with real URLs, run:
+
+```bash
+pnpm demo:check -- apiUrl=https://YOUR-REPLIT-API-URL webUrl=https://YOUR-VERCEL-URL
+pnpm github:identity-check
+```
+
+`demo:check` verifies `/health`, `/ready`, `/version`, `/demo/status`, and `/demo/proof`. Replace the placeholders with real hosted URLs before running it.

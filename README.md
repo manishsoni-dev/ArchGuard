@@ -1,6 +1,6 @@
 # ArchGuard
 
-[![CI](https://github.com/Manisshhhhhh/ArchGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/Manisshhhhhh/ArchGuard/actions/workflows/ci.yml)
+[![CI](https://github.com/manishsoni-dev/ArchGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/manishsoni-dev/ArchGuard/actions/workflows/ci.yml)
 
 ArchGuard is an AI-powered GitHub PR bot that checks whether new code fits a repository's architecture.
 
@@ -40,7 +40,7 @@ The result is advisory in this local MVP, but the workflow is real: GitHub webho
 
 ## Live Proof
 
-This repository has been verified end-to-end as a real GitHub App against `Manisshhhhhh/ArchGuard`.
+This repository has been verified end-to-end as a real GitHub App against `manishsoni-dev/ArchGuard`.
 
 - PR #1: `DRIFT_RISK` for a frontend file importing the database layer directly.
 - PR #2: `FIT` for a normal diagnostic maintenance change.
@@ -91,7 +91,7 @@ Deployment assets:
 
 Useful deployment checks:
 
-Do not run commands with literal placeholders such as `THE_REAL_API_SERVICE_URL`, `YOUR-STABLE-DOMAIN`, or `YOUR-DEPLOYED-DOMAIN`. Copy the exact public domain from the Railway API service.
+Do not run commands with literal placeholders such as `THE_REAL_API_SERVICE_URL`, `YOUR-STABLE-DOMAIN`, `YOUR-DEPLOYED-DOMAIN`, `YOUR-REPLIT-API-URL`, or `YOUR-VERCEL-URL`. Copy the exact public domain from the Railway API service, Replit, or Vercel.
 
 ```bash
 pnpm deployment:checklist
@@ -101,7 +101,9 @@ pnpm railway:domain-check -- baseUrl=https://YOUR-DEPLOYED-DOMAIN
 pnpm github-app:cutover-plan -- url=https://YOUR-STABLE-DOMAIN.com
 pnpm validate:prod-env
 pnpm smoke:deployment -- baseUrl=https://YOUR-DEPLOYED-DOMAIN
-pnpm hosted:pr-proof -- owner=OWNER repo=REPO pr=NUMBER baseUrl=https://YOUR-DEPLOYED-DOMAIN
+pnpm demo:check -- apiUrl=https://YOUR-REPLIT-API-URL webUrl=https://YOUR-VERCEL-URL
+pnpm github:identity-check
+pnpm hosted:pr-proof -- owner=manishsoni-dev repo=ArchGuard pr=NUMBER baseUrl=https://YOUR-DEPLOYED-DOMAIN
 pnpm docker:build:api
 pnpm docker:build:worker
 ```

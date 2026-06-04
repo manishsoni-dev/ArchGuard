@@ -85,6 +85,9 @@ function isPlaceholderUrl(value: string): boolean {
   return (
     /\bTHE_REAL_API_SERVICE_URL\b/i.test(value) ||
     /\bTHE_REAL_API_URL\b/i.test(value) ||
+    /\bYOUR-REPLIT-API-URL\b/i.test(value) ||
+    /\bYOUR-VERCEL-URL\b/i.test(value) ||
+    /\bYOUR_API_URL\b/i.test(value) ||
     /YOUR-STABLE-DOMAIN/i.test(value) ||
     /YOUR-DEPLOYED-DOMAIN/i.test(value) ||
     /ACTUAL-API-DOMAIN/i.test(value) ||

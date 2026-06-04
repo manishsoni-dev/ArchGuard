@@ -43,7 +43,7 @@ Make the point that the API does not run analysis inline. It accepts and persist
 Open:
 
 ```text
-https://github.com/Manisshhhhhh/ArchGuard/pull/1
+https://github.com/manishsoni-dev/ArchGuard/pull/1
 ```
 
 Point out:
@@ -75,7 +75,7 @@ Explain:
 Open:
 
 ```text
-https://github.com/Manisshhhhhh/ArchGuard/pull/3
+https://github.com/manishsoni-dev/ArchGuard/pull/3
 ```
 
 Point out:

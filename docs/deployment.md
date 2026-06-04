@@ -156,7 +156,9 @@ Useful diagnostics:
 pnpm webhook:events
 pnpm queue:inspect
 pnpm analysis:runs
-pnpm hosted:pr-proof -- owner=OWNER repo=REPO pr=NUMBER baseUrl=https://YOUR-DOMAIN
+pnpm demo:check -- apiUrl=https://YOUR-DOMAIN
+pnpm github:identity-check
+pnpm hosted:pr-proof -- owner=manishsoni-dev repo=ArchGuard pr=NUMBER baseUrl=https://YOUR-DOMAIN
 ```
 
 ## Rollback Strategy

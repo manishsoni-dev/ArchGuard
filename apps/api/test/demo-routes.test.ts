@@ -15,7 +15,7 @@ afterEach(async () => {
 describe("demo routes", () => {
   it("GET / returns a safe HTML demo API landing response", async () => {
     server = await buildTestServer({
-      DEMO_REPO_URL: "https://github.com/Manisshhhhhh/ArchGuard"
+      DEMO_REPO_URL: "https://github.com/manishsoni-dev/ArchGuard"
     });
 
     const response = await server.inject({
@@ -34,7 +34,7 @@ describe("demo routes", () => {
     expect(response.body).toContain("/demo");
     expect(response.body).toContain("/demo/status");
     expect(response.body).toContain("/demo/proof");
-    expect(response.body).toContain("https://github.com/Manisshhhhhh/ArchGuard");
+    expect(response.body).toContain("https://github.com/manishsoni-dev/ArchGuard");
     expect(response.body).toContain("This is a demo API. No secrets or raw prompts are exposed.");
     expect(response.body).not.toContain("webhook-secret");
     expect(response.body).not.toContain("client-secret");

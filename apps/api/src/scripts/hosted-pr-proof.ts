@@ -57,7 +57,7 @@ const argsSchema = z.object({
 });
 
 const hostedProofExamples = [
-  "pnpm hosted:pr-proof -- owner=Manisshhhhhh repo=ArchGuard pr=6 baseUrl=https://archguard-production.up.railway.app"
+  "pnpm hosted:pr-proof -- owner=manishsoni-dev repo=ArchGuard pr=6 baseUrl=https://archguard-production.up.railway.app"
 ];
 
 export function parseHostedPrProofArgs(argv: string[]): HostedPrProofInput {
