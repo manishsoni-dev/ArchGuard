@@ -3,6 +3,7 @@ import { loadEnv, type Env } from "./env.js";
 import { prisma } from "./db/prisma.js";
 import { registerGitHubWebhookRoute } from "./routes/github-webhook.js";
 import { registerHealthRoutes, type ReadinessDependencies } from "./routes/health.js";
+import { registerDemoRoutes } from "./routes/demo.js";
 import type { AnalysisEnqueuer } from "./jobs/enqueue-analysis.js";
 import { BullMQAnalysisEnqueuer } from "./jobs/enqueue-analysis.js";
 import { createAnalysisQueue, createRedisConnection } from "./jobs/queue.js";
@@ -21,6 +22,13 @@ export type ServerEnv = Pick<
   | "DEV_WEBHOOK_TOKEN"
   | "APP_VERSION"
   | "GIT_SHA"
+  | "ANALYZER_PROVIDER"
+  | "LLM_PROVIDER"
+  | "EMBEDDING_PROVIDER"
+  | "DEMO_REPO_URL"
+  | "DEMO_DRIFT_PR_URL"
+  | "DEMO_FIT_PR_URL"
+  | "DEMO_ALLOWED_ORIGIN"
   | "NODE_ENV"
 >;
 
@@ -34,6 +42,10 @@ export type BuildServerOptions = {
 export async function buildServer(options: BuildServerOptions) {
   const fastify = Fastify({
     logger: true
+  });
+
+  await registerDemoRoutes(fastify, {
+    env: options.env
   });
 
   await registerHealthRoutes(fastify, {

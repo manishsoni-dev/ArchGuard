@@ -49,11 +49,14 @@ describe("setup-github-app-interactive", () => {
     await copyFile(fixturePemPath, pemPath);
     const output: string[] = [];
 
-    const selected = await promptForPemPath(answerPrompter([pemPath]), tmpDir, (message) => output.push(message));
+    const selected = await promptForPemPath(answerPrompter(["1"]), tmpDir, (message) => output.push(message), {
+      searchDirs: [tmpDir]
+    });
 
     expect(selected).toBe(pemPath);
     expect(output.join("\n")).toContain("Discovered PEM files");
     expect(output.join("\n")).toContain(pemPath);
+    expect(output.join("\n")).not.toContain(os.homedir());
   });
 
   it("converts PEM to escaped newline format and writes .env", async () => {
@@ -63,6 +66,7 @@ describe("setup-github-app-interactive", () => {
 
     const result = await runInteractiveGitHubAppSetup({
       cwd: repoRoot,
+      searchDirs: [repoRoot],
       prompter: answerPrompter(validAnswers({ pemSelection: "1" })),
       writeOutput: () => undefined
     });
@@ -91,6 +95,7 @@ describe("setup-github-app-interactive", () => {
 
     const result = await runInteractiveGitHubAppSetup({
       cwd: repoRoot,
+      searchDirs: [repoRoot],
       prompter: answerPrompter(validAnswers({ pemSelection: "1" })),
       writeOutput: () => undefined
     });
@@ -113,6 +118,7 @@ describe("setup-github-app-interactive", () => {
 
     const result = await runInteractiveGitHubAppSetup({
       cwd: repoRoot,
+      searchDirs: [repoRoot],
       prompter: answerPrompter(validAnswers({ pemSelection: "1" })),
       writeOutput: () => undefined
     });
@@ -129,6 +135,7 @@ describe("setup-github-app-interactive", () => {
     const output: string[] = [];
     const result = await runInteractiveGitHubAppSetup({
       cwd: repoRoot,
+      searchDirs: [repoRoot],
       prompter: answerPrompter(["", "", "", "", "", "", "", ""]),
       writeOutput: (message) => output.push(message)
     });
@@ -146,6 +153,7 @@ describe("setup-github-app-interactive", () => {
 
     const exitCode = await runInteractiveGitHubAppSetupCli({
       cwd: repoRoot,
+      searchDirs: [repoRoot],
       prompter: answerPrompter(validAnswers({ pemSelection: "1" })),
       writeOutput: (message) => output.push(message),
       writeError: (message) => output.push(message)
@@ -163,12 +171,33 @@ describe("setup-github-app-interactive", () => {
 
     const exitCode = await runInteractiveGitHubAppSetupCli({
       cwd: repoRoot,
+      searchDirs: [repoRoot],
       prompter: answerPrompter(validAnswers({ pemSelection: pemPath })),
       writeOutput: () => undefined,
       writeError: () => undefined
     });
 
     expect(exitCode).toBe(1);
+  });
+
+  it("closes injected prompt resources after CLI execution", async () => {
+    const repoRoot = await repoFixtureDir();
+    const pemPath = path.join(repoRoot, "github-app.pem");
+    await copyFile(fixturePemPath, pemPath);
+    let closed = false;
+
+    const exitCode = await runInteractiveGitHubAppSetupCli({
+      cwd: repoRoot,
+      searchDirs: [repoRoot],
+      prompter: answerPrompter(validAnswers({ pemSelection: "1" }), () => {
+        closed = true;
+      }),
+      writeOutput: () => undefined,
+      writeError: () => undefined
+    });
+
+    expect(exitCode).toBe(0);
+    expect(closed).toBe(true);
   });
 });
 
@@ -199,10 +228,11 @@ function validAnswers(overrides: { pemSelection?: string } = {}): string[] {
   ];
 }
 
-function answerPrompter(answers: string[]) {
+function answerPrompter(answers: string[], close?: () => void) {
   let index = 0;
   return {
-    question: async () => answers[index++] ?? ""
+    question: async () => answers[index++] ?? "",
+    close
   };
 }
 

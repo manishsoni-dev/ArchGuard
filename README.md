@@ -81,6 +81,7 @@ ArchGuard can be deployed as two Node.js processes: an API server and a BullMQ w
 Deployment assets:
 
 - [docs/deployment.md](docs/deployment.md)
+- [docs/vercel-replit-live-demo.md](docs/vercel-replit-live-demo.md)
 - [docs/operations.md](docs/operations.md)
 - [docs/railway-deployment.md](docs/railway-deployment.md)
 - [deploy/README.md](deploy/README.md)

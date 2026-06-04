@@ -1,0 +1,16 @@
+modules = ["nodejs-22"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "pnpm install && pnpm prisma:generate && pnpm prisma migrate deploy --schema prisma/schema.prisma && pnpm demo:replit"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[env]
+ANALYZER_PROVIDER = "rag"
+LLM_PROVIDER = "mock"
+EMBEDDING_PROVIDER = "fake"

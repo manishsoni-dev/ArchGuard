@@ -208,6 +208,13 @@ function testEnv(): ServerEnv {
     DEV_WEBHOOK_TOKEN: "dev-token",
     APP_VERSION: "0.1.0",
     GIT_SHA: "test-sha",
+    ANALYZER_PROVIDER: "rag",
+    LLM_PROVIDER: "mock",
+    EMBEDDING_PROVIDER: "fake",
+    DEMO_REPO_URL: undefined,
+    DEMO_DRIFT_PR_URL: undefined,
+    DEMO_FIT_PR_URL: undefined,
+    DEMO_ALLOWED_ORIGIN: "*",
     NODE_ENV: "test"
   };
 }

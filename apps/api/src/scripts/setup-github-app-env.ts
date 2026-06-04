@@ -55,6 +55,15 @@ export type SetupGitHubAppEnvResult = {
   errors: string[];
 };
 
+export type FindPemCandidatesOptions = {
+  searchDirs?: string[];
+  cwd?: string;
+  maxDepth?: number;
+  limit?: number;
+};
+
+const ignoredPemSearchDirs = new Set(["node_modules", ".git", ".tmp", ".reports", ".archguard"]);
+
 const GITHUB_ENV_KEYS = [
   "GITHUB_APP_ID",
   "GITHUB_PRIVATE_KEY",
@@ -66,7 +75,11 @@ const GITHUB_ENV_KEYS = [
   "TEST_GITHUB_REPO"
 ] as const;
 
-export async function runSetupGitHubAppEnv(rawArgs: string[], cwd = process.cwd()): Promise<SetupGitHubAppEnvResult> {
+export async function runSetupGitHubAppEnv(
+  rawArgs: string[],
+  cwd = process.cwd(),
+  pemDiscoveryOptions: Omit<FindPemCandidatesOptions, "cwd"> = {}
+): Promise<SetupGitHubAppEnvResult> {
   const parsedArgsResult = setupArgsSchema.safeParse(parseCliArgs(rawArgs));
   if (!parsedArgsResult.success) {
     return {
@@ -80,7 +93,7 @@ export async function runSetupGitHubAppEnv(rawArgs: string[], cwd = process.cwd(
   const repoRoot = await findRepoRoot(cwd);
 
   if (parsedArgs.findPem) {
-    const candidates = await findPemCandidates(cwd);
+    const candidates = await findPemCandidates({ cwd, ...pemDiscoveryOptions });
     return {
       status: "ok",
       pemCandidates: candidates,
@@ -193,24 +206,69 @@ export async function writeGitHubAppEnv(args: RequiredSetupArgs, repoRoot: strin
   return result;
 }
 
-export async function findPemCandidates(cwd = process.cwd()): Promise<string[]> {
-  const searchDirs = [path.join(os.homedir(), "Downloads"), path.join(os.homedir(), "Desktop"), cwd];
+export async function findPemCandidates(options: FindPemCandidatesOptions = {}): Promise<string[]> {
+  const searchDirs = options.searchDirs ?? defaultPemSearchDirs(options.cwd ?? process.cwd());
+  const maxDepth = options.maxDepth ?? 2;
+  const limit = options.limit ?? 25;
   const candidates = new Set<string>();
 
-  for (const dir of searchDirs) {
-    try {
-      const entries = await readdir(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith(".pem")) {
-          candidates.add(path.join(dir, entry.name));
-        }
-      }
-    } catch {
-      // Missing common directories are fine on CI and developer machines.
-    }
+  for (const dir of uniquePaths(searchDirs)) {
+    await collectPemCandidates(path.resolve(dir), 0, maxDepth, limit, candidates);
+    if (candidates.size >= limit) break;
   }
 
-  return [...candidates].sort();
+  return [...candidates].sort().slice(0, limit);
+}
+
+export function defaultPemSearchDirs(cwd = process.cwd()): string[] {
+  return [path.join(os.homedir(), "Downloads"), path.join(os.homedir(), "Desktop"), cwd];
+}
+
+async function collectPemCandidates(
+  dir: string,
+  depth: number,
+  maxDepth: number,
+  limit: number,
+  candidates: Set<string>
+): Promise<void> {
+  if (depth > maxDepth || candidates.size >= limit || shouldIgnorePemSearchDir(dir)) {
+    return;
+  }
+
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    // Missing or unreadable directories are expected across developer machines.
+    return;
+  }
+
+  for (const entry of entries) {
+    if (candidates.size >= limit) break;
+
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isFile() && entry.name.endsWith(".pem")) {
+      candidates.add(entryPath);
+      continue;
+    }
+
+    if (entry.isDirectory()) {
+      await collectPemCandidates(entryPath, depth + 1, maxDepth, limit, candidates);
+    }
+  }
+}
+
+function shouldIgnorePemSearchDir(dir: string): boolean {
+  const normalized = dir.split(path.sep);
+  if (normalized.some((part) => ignoredPemSearchDirs.has(part))) {
+    return true;
+  }
+
+  return dir.endsWith(path.join("apps", "api", ".archguard"));
+}
+
+function uniquePaths(paths: string[]): string[] {
+  return [...new Set(paths.map((item) => path.resolve(item)))];
 }
 
 export function parseCliArgs(args: string[]): Record<string, string | boolean> {

@@ -13,11 +13,13 @@ import {
   findPemCandidates,
   findRepoRoot,
   mergeEnv,
+  type FindPemCandidatesOptions,
   type RequiredSetupArgs
 } from "./setup-github-app-env.js";
 
 export type InteractivePrompter = {
   question: (prompt: string) => Promise<string>;
+  close?: () => void;
 };
 
 export type InteractiveSetupResult = {
@@ -39,6 +41,9 @@ export type InteractiveSetupResult = {
 
 export type InteractiveSetupOptions = {
   cwd?: string;
+  searchDirs?: string[];
+  maxPemSearchDepth?: number;
+  pemSearchLimit?: number;
   prompter: InteractivePrompter;
   writeOutput?: (message: string) => void;
 };
@@ -66,7 +71,11 @@ export async function runInteractiveGitHubAppSetup(options: InteractiveSetupOpti
   writeOutput("ArchGuard GitHub App setup");
   writeOutput("Secrets are masked in output and written only to .env.");
 
-  const pem = await promptForPemPath(options.prompter, cwd, writeOutput);
+  const pem = await promptForPemPath(options.prompter, cwd, writeOutput, {
+    searchDirs: options.searchDirs,
+    maxDepth: options.maxPemSearchDepth,
+    limit: options.pemSearchLimit
+  });
   const inputValuesResult = interactiveInputSchema.safeParse({
     appId: await options.prompter.question("GitHub App ID: "),
     clientId: await options.prompter.question("Client ID: "),
@@ -213,9 +222,13 @@ export async function validateInteractiveInput(inputValues: z.infer<typeof inter
 export async function promptForPemPath(
   prompter: InteractivePrompter,
   cwd: string,
-  writeOutput: (message: string) => void
+  writeOutput: (message: string) => void,
+  discoveryOptions: Omit<FindPemCandidatesOptions, "cwd"> = {}
 ): Promise<string> {
-  const candidates = await findPemCandidates(cwd);
+  const candidates = await findPemCandidates({
+    cwd,
+    ...discoveryOptions
+  });
   if (candidates.length > 0) {
     writeOutput("Discovered PEM files:");
     candidates.forEach((candidate, index) => {
@@ -253,21 +266,19 @@ export async function runInteractiveGitHubAppSetupCli(options: InteractiveSetupC
   } catch (error) {
     options.writeError?.(error instanceof Error ? error.message : String(error));
     return 1;
+  } finally {
+    options.prompter.close?.();
   }
 }
 
 async function main(): Promise<void> {
   const rl = readline.createInterface({ input, output });
-  try {
-    const exitCode = await runInteractiveGitHubAppSetupCli({
-      prompter: rl,
-      writeOutput: (message) => console.log(message),
-      writeError: (message) => console.error(message)
-    });
-    process.exitCode = exitCode;
-  } finally {
-    rl.close();
-  }
+  const exitCode = await runInteractiveGitHubAppSetupCli({
+    prompter: rl,
+    writeOutput: (message) => console.log(message),
+    writeError: (message) => console.error(message)
+  });
+  process.exitCode = exitCode;
 }
 
 if (process.env.NODE_ENV !== "test") {

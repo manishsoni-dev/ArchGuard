@@ -47,6 +47,7 @@
     "docker:build:api": "docker build -f Dockerfile.api -t archguard-api:local .",
     "docker:build:worker": "docker build -f Dockerfile.worker -t archguard-worker:local .",
     "verify:local": "node scripts/verify-local.mjs",
+    "demo:replit": "node scripts/replit-demo-runner.mjs",
     "build": "pnpm -r build",
     "test": "pnpm --filter @archguard/api test",
     "typecheck": "pnpm -r typecheck",
