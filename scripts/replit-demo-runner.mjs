@@ -43,6 +43,7 @@ function main() {
   const env = applyDemoDefaults(process.env);
   const missing = validateRequiredEnv(env);
 
+  // Keep hosted demo startup failures focused on missing runtime secrets.
   if (missing.length > 0) {
     console.error(`Missing required Replit secrets: ${missing.join(", ")}`);
     process.exit(1);
