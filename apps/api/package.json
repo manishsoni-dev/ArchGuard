@@ -28,6 +28,8 @@
     "validate:github-app": "tsx src/scripts/validate-github-app-env.ts",
     "validate:prod-env": "tsx src/scripts/validate-production-env.ts",
     "smoke:deployment": "tsx src/scripts/smoke-deployment.ts",
+    "demo:check": "tsx src/scripts/demo-check.ts",
+    "github:identity-check": "tsx src/scripts/github-identity-check.ts",
     "deployment:checklist": "tsx src/scripts/deployment-checklist.ts",
     "github-app:cutover-plan": "tsx src/scripts/github-app-cutover-plan.ts",
     "hosted:pr-proof": "tsx src/scripts/hosted-pr-proof.ts",

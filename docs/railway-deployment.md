@@ -156,5 +156,5 @@ If the migration command fails, do not cut over the GitHub App webhook.
 11. Run hosted proof with a real PR number:
 
     ```bash
-    pnpm hosted:pr-proof -- owner=Manisshhhhhh repo=ArchGuard pr=5 baseUrl=https://archguard-production.up.railway.app
+    pnpm hosted:pr-proof -- owner=manishsoni-dev repo=ArchGuard pr=5 baseUrl=https://archguard-production.up.railway.app
     ```

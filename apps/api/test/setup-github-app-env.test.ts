@@ -1,6 +1,7 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { describe, expect, it } from "vitest";
 import {
   findPemCandidates,
@@ -23,10 +24,41 @@ describe("setup-github-app-env", () => {
     const candidate = path.join(tmpDir, "github-app.pem");
     await writeFile(candidate, "SECRET PEM CONTENT", "utf8");
 
-    const candidates = await findPemCandidates(tmpDir);
+    const startedAt = performance.now();
+    const candidates = await findPemCandidates({ searchDirs: [tmpDir], maxDepth: 1, limit: 10 });
 
     expect(candidates).toContain(candidate);
+    expect(performance.now() - startedAt).toBeLessThan(1000);
     expect(JSON.stringify(candidates)).not.toContain("SECRET PEM CONTENT");
+  });
+
+  it("find-pem ignores heavy internal directories and respects limit", async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "archguard-pem-bounds-"));
+    await writeFile(path.join(tmpDir, "one.pem"), "one", "utf8");
+    await writeFile(path.join(tmpDir, "two.pem"), "two", "utf8");
+    const ignoredDir = path.join(tmpDir, "node_modules");
+    await writeFile(path.join(tmpDir, "three.txt"), "nope", "utf8");
+    await mkdir(ignoredDir);
+    await writeFile(path.join(ignoredDir, "ignored.pem"), "ignored", "utf8");
+
+    const candidates = await findPemCandidates({ searchDirs: [tmpDir], maxDepth: 2, limit: 1 });
+
+    expect(candidates).toHaveLength(1);
+    expect(JSON.stringify(candidates)).not.toContain("ignored.pem");
+    expect(JSON.stringify(candidates)).not.toContain(os.homedir());
+  });
+
+  it("--find-pem can use explicit search roots without scanning real home", async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), "archguard-find-pem-cli-"));
+    const candidate = path.join(tmpDir, "github-app.pem");
+    await writeFile(candidate, "RAW PEM BODY THAT MUST NOT PRINT", "utf8");
+
+    const result = await runSetupGitHubAppEnv(["--find-pem"], process.cwd(), { searchDirs: [tmpDir] });
+
+    expect(result.status).toBe("ok");
+    expect(result.pemCandidates).toEqual([candidate]);
+    expect(JSON.stringify(result)).not.toContain("RAW PEM BODY THAT MUST NOT PRINT");
+    expect(JSON.stringify(result)).not.toContain(os.homedir());
   });
 
   it("rejects nonexistent pem path", async () => {

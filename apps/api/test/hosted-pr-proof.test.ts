@@ -8,13 +8,13 @@ describe("hosted PR proof", () => {
   it("parses required arguments", () => {
     expect(
       parseHostedPrProofArgs([
-        "owner=Manisshhhhhh",
+        "owner=manishsoni-dev",
         "repo=ArchGuard",
         "pr=4",
         "baseUrl=https://archguard.example.app"
       ])
     ).toEqual({
-      owner: "Manisshhhhhh",
+      owner: "manishsoni-dev",
       repo: "ArchGuard",
       pr: 4,
       baseUrl: "https://archguard.example.app"
@@ -24,7 +24,7 @@ describe("hosted PR proof", () => {
   it("returns friendly error for placeholder PR number", () => {
     try {
       parseHostedPrProofArgs([
-        "owner=Manisshhhhhh",
+        "owner=manishsoni-dev",
         "repo=ArchGuard",
         "pr=PR_NUMBER",
         "baseUrl=https://archguard-production.up.railway.app"
@@ -46,7 +46,7 @@ describe("hosted PR proof", () => {
   it("reports missing Check Run as warning", async () => {
     const report = await runHostedPrProof(
       {
-        owner: "Manisshhhhhh",
+        owner: "manishsoni-dev",
         repo: "ArchGuard",
         pr: 4,
         baseUrl: "https://archguard.example.app"
@@ -99,7 +99,7 @@ describe("hosted PR proof", () => {
     expect(report.status).toBe("warning");
     expect(report.checks.githubCheckRun).toBe("warning");
     expect(report.proof).toMatchObject({
-      pullRequestUrl: "https://github.com/Manisshhhhhh/ArchGuard/pull/4",
+      pullRequestUrl: "https://github.com/manishsoni-dev/ArchGuard/pull/4",
       headSha: "abc123",
       checkRunUrl: null
     });
@@ -138,7 +138,11 @@ function env(): Env {
     RAG_VALIDATE_GOLDEN: false,
     SMOKE_FAIL_ON_FALLBACK: true,
     PUBLIC_WEBHOOK_URL: "https://archguard.example.app",
-    TEST_GITHUB_OWNER: "Manisshhhhhh",
+    DEMO_REPO_URL: undefined,
+    DEMO_DRIFT_PR_URL: undefined,
+    DEMO_FIT_PR_URL: undefined,
+    DEMO_ALLOWED_ORIGIN: "*",
+    TEST_GITHUB_OWNER: "manishsoni-dev",
     TEST_GITHUB_REPO: "ArchGuard",
     TEST_GITHUB_INSTALLATION_ID: 1,
     APP_VERSION: "0.1.0",

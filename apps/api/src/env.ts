@@ -43,6 +43,10 @@ const envSchema = z.object({
   LLM_INPUT_COST_PER_1M_TOKENS: z.coerce.number().nonnegative().optional(),
   LLM_OUTPUT_COST_PER_1M_TOKENS: z.coerce.number().nonnegative().optional(),
   PUBLIC_WEBHOOK_URL: z.string().url().optional(),
+  DEMO_REPO_URL: optionalUrl(),
+  DEMO_DRIFT_PR_URL: optionalUrl(),
+  DEMO_FIT_PR_URL: optionalUrl(),
+  DEMO_ALLOWED_ORIGIN: emptyStringToUndefined(z.string().min(1).default("*")),
   TEST_GITHUB_OWNER: z.string().optional(),
   TEST_GITHUB_REPO: z.string().optional(),
   TEST_GITHUB_PR_NUMBER: z.coerce.number().int().positive().optional(),
@@ -56,4 +60,18 @@ export type Env = z.infer<typeof envSchema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return envSchema.parse(source);
+}
+
+function emptyStringToUndefined<T extends z.ZodTypeAny>(schema: T): z.ZodEffects<T, z.output<T>, unknown> {
+  return z.preprocess((value) => {
+    if (typeof value === "string" && value.trim().length === 0) {
+      return undefined;
+    }
+
+    return value;
+  }, schema);
+}
+
+function optionalUrl() {
+  return emptyStringToUndefined(z.string().url().optional());
 }
