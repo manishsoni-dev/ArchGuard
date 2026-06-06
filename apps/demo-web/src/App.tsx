@@ -41,10 +41,10 @@ const fallbackDriftExample: ProofExample = {
 };
 
 const fallbackFitExample: ProofExample = {
-  pr: 2,
+  pr: 8,
   verdict: "FIT",
   url: null,
-  summary: "Architecture fit confirmed for a normal maintenance change."
+  summary: "Architecture fit confirmed for the live Replit and Vercel demo verification."
 };
 
 const fallbackProof: DemoProof = {

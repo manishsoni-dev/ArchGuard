@@ -72,10 +72,10 @@ export async function registerDemoRoutes(fastify: FastifyInstance, options: Regi
         summary: "Architecture drift risk detected in the demo repository."
       },
       {
-        pr: 2,
+        pr: 8,
         verdict: "FIT",
         url: options.env.DEMO_FIT_PR_URL ?? null,
-        summary: "Architecture fit confirmed for a normal maintenance change."
+        summary: "Architecture fit confirmed for the live Replit and Vercel demo verification."
       },
       {
         pr: 3,

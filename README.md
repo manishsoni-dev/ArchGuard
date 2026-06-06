@@ -40,18 +40,27 @@ The result is advisory in this local MVP, but the workflow is real: GitHub webho
 
 ## Live Proof
 
-This repository has been verified end-to-end as a real GitHub App against `manishsoni-dev/ArchGuard`.
+This repository has been verified end-to-end as a real GitHub App against `manishsoni-dev/ArchGuard`, with a public Replit API and Vercel demo UI.
 
+Live demo:
+
+- Replit API: [https://arch-guard-1--manishsoni-dev.replit.app](https://arch-guard-1--manishsoni-dev.replit.app)
+- Vercel UI: [https://demo-web-delta-five.vercel.app](https://demo-web-delta-five.vercel.app)
+- Proof pack: [docs/live-demo-proof.md](docs/live-demo-proof.md)
+- LinkedIn summary: [docs/linkedin-project-summary.md](docs/linkedin-project-summary.md)
+- Portfolio card copy: [docs/portfolio-card.md](docs/portfolio-card.md)
+
+GitHub Check Run proof:
+
+- PR #8: `FIT`, merged after the live Replit and Vercel demo passed verification.
 - PR #1: `DRIFT_RISK` for a frontend file importing the database layer directly.
-- PR #2: `FIT` for a normal diagnostic maintenance change.
-- PR #3: `FIT` for test discovery cleanup.
 
-Screenshot placeholders:
+Screenshots:
 
-- `docs/screenshots/pr-drift-risk.png`
-- `docs/screenshots/pr-fit.png`
-
-Add real screenshots there when preparing a portfolio page or interview deck.
+- [Replit API root](docs/screenshots/replit-api-root.png)
+- [Vercel demo UI](docs/screenshots/vercel-demo-ui.png)
+- [PR #8 FIT proof](docs/screenshots/pr-8-fit.png)
+- [PR #1 DRIFT_RISK proof](docs/screenshots/pr-1-drift-risk.png)
 
 ## Architecture
 
@@ -82,6 +91,9 @@ Deployment assets:
 
 - [docs/deployment.md](docs/deployment.md)
 - [docs/vercel-replit-live-demo.md](docs/vercel-replit-live-demo.md)
+- [docs/live-demo-proof.md](docs/live-demo-proof.md)
+- [docs/linkedin-project-summary.md](docs/linkedin-project-summary.md)
+- [docs/portfolio-card.md](docs/portfolio-card.md)
 - [docs/operations.md](docs/operations.md)
 - [docs/railway-deployment.md](docs/railway-deployment.md)
 - [deploy/README.md](deploy/README.md)
@@ -90,6 +102,12 @@ Deployment assets:
 - [.env.production.example](.env.production.example)
 
 Useful deployment checks:
+
+Current public demo:
+
+```bash
+pnpm demo:check -- apiUrl=https://arch-guard-1--manishsoni-dev.replit.app -- webUrl=https://demo-web-delta-five.vercel.app
+```
 
 Do not run commands with literal placeholders such as `THE_REAL_API_SERVICE_URL`, `YOUR-STABLE-DOMAIN`, `YOUR-DEPLOYED-DOMAIN`, `YOUR-REPLIT-API-URL`, or `YOUR-VERCEL-URL`. Copy the exact public domain from the Railway API service, Replit, or Vercel.
 
@@ -101,7 +119,6 @@ pnpm railway:domain-check -- baseUrl=https://YOUR-DEPLOYED-DOMAIN
 pnpm github-app:cutover-plan -- url=https://YOUR-STABLE-DOMAIN.com
 pnpm validate:prod-env
 pnpm smoke:deployment -- baseUrl=https://YOUR-DEPLOYED-DOMAIN
-pnpm demo:check -- apiUrl=https://YOUR-REPLIT-API-URL webUrl=https://YOUR-VERCEL-URL
 pnpm github:identity-check
 pnpm hosted:pr-proof -- owner=manishsoni-dev repo=ArchGuard pr=NUMBER baseUrl=https://YOUR-DEPLOYED-DOMAIN
 pnpm docker:build:api
