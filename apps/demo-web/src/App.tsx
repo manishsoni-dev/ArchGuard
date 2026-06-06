@@ -3,7 +3,9 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
+  Boxes,
   CheckCircle2,
+  Clock3,
   ExternalLink,
   FileText,
   GitPullRequest,
@@ -39,6 +41,7 @@ type DemoProof = {
 const publicApiUrl = "https://arch-guard-1--manishsoni-dev.replit.app";
 const repositoryUrl = "https://github.com/manishsoni-dev/ArchGuard";
 const docsUrl = "https://github.com/manishsoni-dev/ArchGuard/blob/main/docs/live-demo-proof.md";
+const liveDemoName = "ArchGuard.vercel.app";
 
 const proofUrls = {
   drift: "https://github.com/manishsoni-dev/ArchGuard/pull/1",
@@ -71,7 +74,13 @@ const endpointChecks = [
   { label: "Demo proof", path: "/demo/proof" }
 ];
 
-const architectureFlow = ["GitHub PR", "Fastify API", "BullMQ Worker", "Repository Context", "GitHub Check Run"];
+const architectureFlow = [
+  { label: "GitHub PR", detail: "Signed pull request event" },
+  { label: "Fastify API", detail: "Webhook intake and validation" },
+  { label: "BullMQ Worker", detail: "Queued architecture analysis" },
+  { label: "Repository Context", detail: "RAG evidence retrieval" },
+  { label: "GitHub Check Run", detail: "FIT or drift-risk verdict" }
+];
 
 function App() {
   const apiUrl = normalizeApiUrl(import.meta.env.VITE_ARCHGUARD_API_URL) || publicApiUrl;
@@ -128,7 +137,10 @@ function App() {
           <span className="brandIcon">
             <ShieldCheck aria-hidden="true" size={18} />
           </span>
-          ArchGuard
+          <span>
+            ArchGuard
+            <small>{liveDemoName}</small>
+          </span>
         </a>
         <nav aria-label="Primary navigation">
           <a href="#overview">Overview</a>
@@ -181,12 +193,18 @@ function App() {
 
           <aside className="demoOverview" aria-label="ArchGuard demo overview">
             <div className="overviewHeader">
-              <span>Live demo</span>
+              <span>{liveDemoName}</span>
               <strong>Production-style proof surface</strong>
             </div>
-            <Metric label="Demo mode" value="RAG + mock LLM" />
-            <Metric label="Webhook flow" value="API -> Worker -> Check Run" />
-            <Metric label="Proof set" value="1 drift risk, 4 fits" />
+            <div className="metricGrid">
+              <Metric label="Demo mode" value="RAG + mock LLM" />
+              <Metric label="Webhook flow" value="API -> Worker -> Check Run" />
+              <Metric label="Proof set" value="1 drift risk, 4 fits" />
+            </div>
+            <div className="overviewNote">
+              <CheckCircle2 aria-hidden="true" size={18} />
+              <span>Live proof endpoints are public and safe to inspect.</span>
+            </div>
           </aside>
         </section>
 
@@ -203,9 +221,12 @@ function App() {
           </div>
           <div className="flow" aria-label="Architecture flow">
             {architectureFlow.map((step, index) => (
-              <div className="flowStep" key={step}>
+              <div className="flowStep" key={step.label}>
                 <span>{index + 1}</span>
-                <strong>{step}</strong>
+                <div>
+                  <strong>{step.label}</strong>
+                  <p>{step.detail}</p>
+                </div>
                 {index < architectureFlow.length - 1 ? <ArrowRight aria-hidden="true" size={17} /> : null}
               </div>
             ))}
@@ -317,8 +338,17 @@ function StatusCard({ result, apiUrl }: { result: EndpointResult; apiUrl: string
         <code>{result.path}</code>
       </div>
       <p>{result.detail}</p>
+      {result.statusCode ? (
+        <div className="statusCode">
+          <Boxes aria-hidden="true" size={15} />
+          HTTP {result.statusCode}
+        </div>
+      ) : null}
       <div className="cardMeta">
-        <span>{result.checkedAt ? `Last checked ${formatTime(result.checkedAt)}` : "Not checked yet"}</span>
+        <span>
+          <Clock3 aria-hidden="true" size={13} />
+          {result.checkedAt ? `Last checked ${formatTime(result.checkedAt)}` : "Not checked yet"}
+        </span>
         <a href={`${apiUrl}${result.path}`} target="_blank" rel="noreferrer">
           Open
           <ExternalLink aria-hidden="true" size={13} />
@@ -389,7 +419,7 @@ async function checkEndpoint(
     ...endpoint,
     state: "ok",
     statusCode: result.statusCode,
-    detail: `HTTP ${result.statusCode}`,
+    detail: "Live endpoint responded successfully",
     checkedAt
   };
 }
