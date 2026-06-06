@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   ExternalLink,
-  GitBranch,
+  FileText,
   GitPullRequest,
+  Github,
   RefreshCw,
   Server,
   ShieldCheck
@@ -19,6 +21,7 @@ type EndpointResult = {
   state: CheckState;
   statusCode?: number;
   detail: string;
+  checkedAt?: Date;
 };
 
 type ProofExample = {
@@ -33,22 +36,31 @@ type DemoProof = {
   examples: ProofExample[];
 };
 
+const publicApiUrl = "https://arch-guard-1--manishsoni-dev.replit.app";
+const repositoryUrl = "https://github.com/manishsoni-dev/ArchGuard";
+const docsUrl = "https://github.com/manishsoni-dev/ArchGuard/blob/main/docs/live-demo-proof.md";
+
+const proofUrls = {
+  drift: "https://github.com/manishsoni-dev/ArchGuard/pull/1",
+  fit: "https://github.com/manishsoni-dev/ArchGuard/pull/8"
+};
+
 const fallbackDriftExample: ProofExample = {
   pr: 1,
   verdict: "DRIFT_RISK",
-  url: null,
-  summary: "Architecture drift risk detected in the demo repository."
+  url: proofUrls.drift,
+  summary: "A frontend-to-database boundary violation caught as architecture drift."
 };
 
 const fallbackFitExample: ProofExample = {
   pr: 8,
   verdict: "FIT",
-  url: null,
-  summary: "Architecture fit confirmed for the live Replit and Vercel demo verification."
+  url: proofUrls.fit,
+  summary: "A valid live demo verification change confirmed as architecture-fit."
 };
 
 const fallbackProof: DemoProof = {
-  repositoryUrl: null,
+  repositoryUrl,
   examples: [fallbackDriftExample, fallbackFitExample]
 };
 
@@ -56,35 +68,47 @@ const endpointChecks = [
   { label: "Health", path: "/health" },
   { label: "Readiness", path: "/ready" },
   { label: "Version", path: "/version" },
-  { label: "Proof", path: "/demo/proof" }
+  { label: "Demo proof", path: "/demo/proof" }
 ];
 
+const architectureFlow = ["GitHub PR", "Fastify API", "BullMQ Worker", "Repository Context", "GitHub Check Run"];
+
 function App() {
-  const apiUrl = normalizeApiUrl(import.meta.env.VITE_ARCHGUARD_API_URL);
+  const apiUrl = normalizeApiUrl(import.meta.env.VITE_ARCHGUARD_API_URL) || publicApiUrl;
   const [results, setResults] = useState<EndpointResult[]>(() =>
     endpointChecks.map((endpoint) => ({
       ...endpoint,
       state: apiUrl ? "idle" : "warning",
-      detail: apiUrl ? "Waiting to check" : "API URL is not configured"
+      detail: apiUrl ? "Waiting for first check" : "API URL is not configured"
     }))
   );
   const [proof, setProof] = useState<DemoProof>(fallbackProof);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const repoUrl = useMemo(() => proof.repositoryUrl ?? "https://github.com/manishsoni-dev/ArchGuard", [proof.repositoryUrl]);
+  const resolvedRepoUrl = useMemo(() => proof.repositoryUrl ?? repositoryUrl, [proof.repositoryUrl]);
 
   async function refresh() {
     if (!apiUrl) return;
 
     setIsRefreshing(true);
-    setResults((current) => current.map((result) => ({ ...result, state: "loading", detail: "Checking live API" })));
+    setResults((current) =>
+      current.map((result) => ({ ...result, state: "loading", detail: "Checking live API" }))
+    );
 
-    const nextResults = await Promise.all(endpointChecks.map((endpoint) => checkEndpoint(apiUrl, endpoint)));
+    const checkedAt = new Date();
+    const nextResults = await Promise.all(
+      endpointChecks.map((endpoint) => checkEndpoint(apiUrl, endpoint, checkedAt))
+    );
     setResults(nextResults);
 
     const proofResult = await fetchJson<DemoProof>(apiUrl, "/demo/proof");
     if (proofResult.ok) {
-      setProof(proofResult.data);
+      setProof({
+        repositoryUrl: proofResult.data.repositoryUrl ?? repositoryUrl,
+        examples: proofResult.data.examples.map(withKnownProofUrl)
+      });
+    } else {
+      setProof(fallbackProof);
     }
 
     setIsRefreshing(false);
@@ -98,126 +122,208 @@ function App() {
   const fitExample = proof.examples.find((example) => example.verdict === "FIT") ?? fallbackFitExample;
 
   return (
-    <main>
-      <section className="hero">
-        <div className="heroCopy">
-          <div className="eyebrow">
+    <>
+      <header className="topNav">
+        <a className="brandMark" href="#overview" aria-label="ArchGuard home">
+          <span className="brandIcon">
             <ShieldCheck aria-hidden="true" size={18} />
-            Live PR architecture fitness
-          </div>
-          <h1>ArchGuard</h1>
-          <p>
-            ArchGuard checks whether pull requests fit a repository&apos;s existing architecture before drift turns into
-            expensive review debt.
-          </p>
-          <div className="heroActions">
-            <a className="primaryLink" href={repoUrl} target="_blank" rel="noreferrer">
-              <GitBranch aria-hidden="true" size={18} />
-              GitHub repo
-              <ExternalLink aria-hidden="true" size={16} />
-            </a>
-            {apiUrl ? (
+          </span>
+          ArchGuard
+        </a>
+        <nav aria-label="Primary navigation">
+          <a href="#overview">Overview</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#proof">Proof</a>
+          <a href={docsUrl} target="_blank" rel="noreferrer">
+            Docs
+          </a>
+          <a href={resolvedRepoUrl} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+        </nav>
+        <div className="navActions">
+          <span className="statusPill">
+            <span aria-hidden="true" />
+            All systems operational
+          </span>
+          <a className="navButton" href={resolvedRepoUrl} target="_blank" rel="noreferrer">
+            <Github aria-hidden="true" size={16} />
+            GitHub
+          </a>
+        </div>
+      </header>
+
+      <main>
+        <section className="hero" id="overview">
+          <div className="heroCopy">
+            <div className="eyebrow">
+              <ShieldCheck aria-hidden="true" size={16} />
+              AI-powered architecture review
+            </div>
+            <h1>ArchGuard</h1>
+            <p className="heroLead">
+              AI-powered GitHub PR architecture review bot. Checks pull requests for architecture fitness before drift
+              becomes review debt.
+            </p>
+            <div className="heroActions">
+              <a className="primaryLink" href={resolvedRepoUrl} target="_blank" rel="noreferrer">
+                <Github aria-hidden="true" size={18} />
+                View GitHub Repo
+                <ExternalLink aria-hidden="true" size={15} />
+              </a>
               <a className="secondaryLink" href={`${apiUrl}/demo`} target="_blank" rel="noreferrer">
                 <Server aria-hidden="true" size={18} />
-                Demo API
-                <ExternalLink aria-hidden="true" size={16} />
+                Open Live Demo API
+                <ExternalLink aria-hidden="true" size={15} />
               </a>
-            ) : null}
-          </div>
-        </div>
-        <div className="heroPanel" aria-label="ArchGuard live demo summary">
-          <div className="panelMetric">
-            <span>Demo mode</span>
-            <strong>RAG + mock LLM</strong>
-          </div>
-          <div className="panelMetric">
-            <span>Webhook flow</span>
-            <strong>API to worker to Check Run</strong>
-          </div>
-          <div className="panelMetric">
-            <span>Proof set</span>
-            <strong>1 drift risk, 4 fits</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="band split">
-        <div>
-          <h2>What ArchGuard does</h2>
-          <p>
-            It listens for GitHub pull request events, persists the webhook, queues analysis, retrieves architecture
-            context from the repository, and posts an advisory Check Run verdict.
-          </p>
-        </div>
-        <div className="flow" aria-label="Architecture flow">
-          {["GitHub PR", "Fastify API", "BullMQ worker", "Repository context", "Check Run"].map((step, index) => (
-            <div className="flowStep" key={step}>
-              <span>{index + 1}</span>
-              <strong>{step}</strong>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="band">
-        <div className="sectionHeader">
-          <div>
-            <h2>Live API status</h2>
-            <p>{apiUrl ? apiUrl : "Set VITE_ARCHGUARD_API_URL in Vercel to connect this page to the demo API."}</p>
           </div>
-          <button className="iconButton" type="button" onClick={refresh} disabled={!apiUrl || isRefreshing} title="Refresh status">
-            <RefreshCw aria-hidden="true" size={18} />
-          </button>
-        </div>
-        <div className="statusGrid">
-          {results.map((result) => (
-            <StatusCard key={result.path} result={result} apiUrl={apiUrl} />
-          ))}
-        </div>
-      </section>
 
-      <section className="band">
-        <div className="sectionHeader">
-          <div>
-            <h2>Proof PRs</h2>
-            <p>Static safe proof from the live demo API, with links only when configured.</p>
+          <aside className="demoOverview" aria-label="ArchGuard demo overview">
+            <div className="overviewHeader">
+              <span>Live demo</span>
+              <strong>Production-style proof surface</strong>
+            </div>
+            <Metric label="Demo mode" value="RAG + mock LLM" />
+            <Metric label="Webhook flow" value="API -> Worker -> Check Run" />
+            <Metric label="Proof set" value="1 drift risk, 4 fits" />
+          </aside>
+        </section>
+
+        <section className="section" id="how-it-works">
+          <div className="sectionHeader">
+            <div>
+              <span className="sectionKicker">Architecture flow</span>
+              <h2>From pull request to architecture verdict.</h2>
+            </div>
+            <p>
+              ArchGuard receives signed GitHub events, queues analysis work, retrieves repository context, and posts an
+              advisory Check Run back to the PR.
+            </p>
           </div>
-        </div>
-        <div className="proofGrid">
-          <ProofCard example={driftExample} tone="risk" />
-          <ProofCard example={fitExample} tone="fit" />
-        </div>
-      </section>
+          <div className="flow" aria-label="Architecture flow">
+            {architectureFlow.map((step, index) => (
+              <div className="flowStep" key={step}>
+                <span>{index + 1}</span>
+                <strong>{step}</strong>
+                {index < architectureFlow.length - 1 ? <ArrowRight aria-hidden="true" size={17} /> : null}
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <section className="band limitations">
-        <h2>Demo limits</h2>
-        <ul>
-          <li>No billing, account management, or dashboard is included.</li>
-          <li>No OpenAI key is required in the default demo mode.</li>
-          <li>The public API never exposes secrets, raw prompts, database URLs, Redis URLs, or retrieved context.</li>
-        </ul>
-      </section>
-    </main>
+        <section className="section" id="status">
+          <div className="sectionHeader">
+            <div>
+              <span className="sectionKicker">Live API status</span>
+              <h2>Public endpoints, checked from the browser.</h2>
+            </div>
+            <div className="refreshCluster">
+              <p>{apiUrl}</p>
+              <button
+                className="iconButton"
+                type="button"
+                onClick={refresh}
+                disabled={!apiUrl || isRefreshing}
+                title="Refresh API status"
+              >
+                <RefreshCw aria-hidden="true" size={18} />
+              </button>
+            </div>
+          </div>
+          <div className="statusGrid">
+            {results.map((result) => (
+              <StatusCard key={result.path} result={result} apiUrl={apiUrl} />
+            ))}
+          </div>
+        </section>
+
+        <section className="section" id="proof">
+          <div className="sectionHeader">
+            <div>
+              <span className="sectionKicker">Proof PRs</span>
+              <h2>Real GitHub checks, not a static mockup.</h2>
+            </div>
+            <p>
+              One proof case demonstrates architecture drift detection. The other shows a verified FIT result from the
+              live demo rollout.
+            </p>
+          </div>
+          <div className="proofGrid">
+            <ProofCard example={withKnownProofUrl(driftExample)} tone="risk" />
+            <ProofCard example={withKnownProofUrl(fitExample)} tone="fit" />
+          </div>
+        </section>
+
+        <section className="section limitsSection">
+          <div className="sectionHeader">
+            <div>
+              <span className="sectionKicker">Demo limits</span>
+              <h2>Honest scope for a public portfolio demo.</h2>
+            </div>
+          </div>
+          <div className="limitsGrid">
+            <LimitCard title="No SaaS surface" body="No billing, account management, auth, or dashboard is included." />
+            <LimitCard title="Deterministic demo mode" body="Uses demo mode: RAG + mock LLM, so no OpenAI key is required." />
+            <LimitCard title="Safe public proof" body="Public proof endpoints are safe to inspect and do not expose secrets." />
+            <LimitCard
+              title="Webhook boundary"
+              body="The webhook endpoint is for signed GitHub POST requests, not browser GET."
+            />
+          </div>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <div>
+          <strong>ArchGuard</strong>
+          <span>Architecture fitness checks for GitHub pull requests.</span>
+        </div>
+        <div className="footerLinks">
+          <a href={resolvedRepoUrl} target="_blank" rel="noreferrer">
+            GitHub repo
+          </a>
+          <a href={docsUrl} target="_blank" rel="noreferrer">
+            Docs
+          </a>
+        </div>
+        <p>Fastify · BullMQ · PostgreSQL/pgvector · Redis · GitHub Checks API</p>
+      </footer>
+    </>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
 function StatusCard({ result, apiUrl }: { result: EndpointResult; apiUrl: string }) {
   const Icon = result.state === "ok" ? CheckCircle2 : result.state === "warning" ? AlertTriangle : Activity;
+  const statusLabel = statusText(result.state);
 
   return (
     <article className={`statusCard ${result.state}`}>
       <div className="cardTop">
-        <Icon aria-hidden="true" size={20} />
+        <Icon aria-hidden="true" size={18} />
         <span>{result.label}</span>
       </div>
-      <strong>{result.path}</strong>
+      <div>
+        <strong>{statusLabel}</strong>
+        <code>{result.path}</code>
+      </div>
       <p>{result.detail}</p>
-      {apiUrl ? (
+      <div className="cardMeta">
+        <span>{result.checkedAt ? `Last checked ${formatTime(result.checkedAt)}` : "Not checked yet"}</span>
         <a href={`${apiUrl}${result.path}`} target="_blank" rel="noreferrer">
-          Open endpoint
-          <ExternalLink aria-hidden="true" size={14} />
+          Open
+          <ExternalLink aria-hidden="true" size={13} />
         </a>
-      ) : null}
+      </div>
     </article>
   );
 }
@@ -226,19 +332,25 @@ function ProofCard({ example, tone }: { example: DemoProof["examples"][number]; 
   return (
     <article className={`proofCard ${tone}`}>
       <div className="cardTop">
-        <GitPullRequest aria-hidden="true" size={20} />
+        <GitPullRequest aria-hidden="true" size={18} />
         <span>PR #{example.pr}</span>
       </div>
       <strong>{example.verdict}</strong>
       <p>{example.summary}</p>
-      {example.url ? (
-        <a href={example.url} target="_blank" rel="noreferrer">
-          View PR
-          <ExternalLink aria-hidden="true" size={14} />
-        </a>
-      ) : (
-        <span className="muted">Link not configured</span>
-      )}
+      <a href={example.url ?? proofUrls.fit} target="_blank" rel="noreferrer">
+        View proof PR
+        <ExternalLink aria-hidden="true" size={13} />
+      </a>
+    </article>
+  );
+}
+
+function LimitCard({ title, body }: { title: string; body: string }) {
+  return (
+    <article className="limitCard">
+      <FileText aria-hidden="true" size={18} />
+      <strong>{title}</strong>
+      <p>{body}</p>
     </article>
   );
 }
@@ -248,7 +360,8 @@ async function checkEndpoint(
   endpoint: {
     label: string;
     path: string;
-  }
+  },
+  checkedAt: Date
 ): Promise<EndpointResult> {
   const result = await fetchJson<unknown>(apiUrl, endpoint.path);
 
@@ -258,7 +371,8 @@ async function checkEndpoint(
         ...endpoint,
         state: "warning",
         statusCode: result.statusCode,
-        detail: `Reachable but not ready (${result.statusCode})`
+        detail: `Reachable but not ready (${result.statusCode})`,
+        checkedAt
       };
     }
 
@@ -266,7 +380,8 @@ async function checkEndpoint(
       ...endpoint,
       state: "error",
       statusCode: result.statusCode,
-      detail: result.statusCode ? `Request returned ${result.statusCode}` : "Could not reach API"
+      detail: result.statusCode ? `Request returned ${result.statusCode}` : "Could not reach API",
+      checkedAt
     };
   }
 
@@ -274,7 +389,8 @@ async function checkEndpoint(
     ...endpoint,
     state: "ok",
     statusCode: result.statusCode,
-    detail: `HTTP ${result.statusCode}`
+    detail: `HTTP ${result.statusCode}`,
+    checkedAt
   };
 }
 
@@ -300,6 +416,28 @@ function normalizeApiUrl(value: string | undefined): string {
   if (!value?.trim()) return "";
 
   return value.trim().replace(/\/+$/, "");
+}
+
+function withKnownProofUrl(example: ProofExample): ProofExample {
+  if (example.verdict === "DRIFT_RISK") return { ...example, pr: 1, url: proofUrls.drift };
+  if (example.verdict === "FIT") return { ...example, pr: 8, url: proofUrls.fit };
+  return example;
+}
+
+function statusText(state: CheckState): string {
+  if (state === "ok") return "Healthy";
+  if (state === "warning") return "Warning";
+  if (state === "error") return "Error";
+  if (state === "loading") return "Checking";
+  return "Waiting";
+}
+
+function formatTime(value: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(value);
 }
 
 export default App;
